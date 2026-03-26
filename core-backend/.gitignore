@@ -70,3 +70,10 @@ jest.config.js
 *.tgz
 *.bak
 *.tmp
+
+# =========================
+# Local files
+# =========================
+.cursor/
+
+build/

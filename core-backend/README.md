@@ -1,6 +1,3 @@
-## Folder structure
-
-```
 core-game-backend/
 ├── index.js
 ├── package.json
@@ -17,4 +14,3 @@ core-game-backend/
 │   └── (route definitions)
 └── utils/
     └── (helpers / utilities)
-```
