@@ -10,6 +10,7 @@ import {
   Platform,
   SafeAreaView,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -106,6 +107,7 @@ function EmptyState({ message }: { message: string }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function TasksScreen() {
+  const router = useRouter();
   const [phase, setPhase] = useState<Phase>('setup');
 
   // ── Setup phase state ──
@@ -227,6 +229,14 @@ export default function TasksScreen() {
               </Text>
             </View>
           )}
+          <Pressable
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onPress={() => router.push('/trees' as any)}
+            style={styles.treesBtn}
+            hitSlop={8}
+          >
+            <Text style={styles.treesBtnText}>🌳</Text>
+          </Pressable>
         </View>
 
         <ScrollView
@@ -541,4 +551,15 @@ const styles = StyleSheet.create({
     borderColor: '#83BF99',
   },
   allDoneText: { fontSize: 14, fontWeight: '700', color: '#5FAD89' },
+
+  // Trees nav button in header
+  treesBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    backgroundColor: '#E1F0E3',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  treesBtnText: { fontSize: 20 },
 });
