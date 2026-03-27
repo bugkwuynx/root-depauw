@@ -162,7 +162,7 @@ export default function OnboardingScreen() {
                       scrollRef.current?.scrollTo({ x: next * SCREEN_WIDTH, animated: true });
                       return;
                     }
-                    router.push('/login');
+                    router.push('/signup');
                   }}
                 >
                   <Text style={textStyles.primaryButtonTextSmall}>
