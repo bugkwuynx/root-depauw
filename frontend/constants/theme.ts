@@ -5,25 +5,39 @@
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+// Well-being Growth Game — pastel green palette
+export const GameColors = {
+  bgLight: '#F3FAED',    // main screen background
+  bgSection: '#E1F0E3',  // section / card background
+  accent: '#83BF99',     // mid green — borders, subtle accents
+  primary: '#5FAD89',    // darker green — buttons, badges
+  textDark: '#2D5A3D',   // headings and body text
+  textMid: '#6B9E82',    // secondary text
+  white: '#FFFFFF',
+  crossBg: '#FEF0F0',    // dismiss button background
+  crossBorder: '#F9C8C8',
+  crossText: '#E07070',
+  coinBg: '#FFFBEB',
+  coinBorder: '#FDE68A',
+  coinText: '#92710A',
+};
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    text: '#2D5A3D',
+    background: '#F3FAED',
+    tint: '#5FAD89',
+    icon: '#83BF99',
+    tabIconDefault: '#83BF99',
+    tabIconSelected: '#5FAD89',
   },
   dark: {
     text: '#ECEDEE',
     background: '#151718',
-    tint: tintColorDark,
+    tint: '#83BF99',
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    tabIconSelected: '#83BF99',
   },
 };
 
