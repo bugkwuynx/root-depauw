@@ -17,8 +17,12 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const THEME = {
   bgPrimary: '#F3FAED',
   bgSecondary: '#E1F0E3',
+  accenLight: '#92BFA2',
   accent: '#83BF99',
   accentDark: '#5FAD89',
+  ground: '#BCB0A0',
+  groundDark: '#5A534B'
+
 } as const;
 
 type HowItWorksSlide = {
@@ -43,7 +47,7 @@ const SLIDES: HowItWorksSlide[] = [
   },
   {
     key: 'grow',
-    title: 'Watch your forest thrive',
+    title: 'Watch your garden thrive',
     subtitle: 'Consistency turns into visible growth',
     renderIllustration: () => <GrowIllustration />,
   },
@@ -536,7 +540,7 @@ const animStyles = StyleSheet.create({
     bottom: 0,
     height: 78,
     width: '100%',
-    backgroundColor: THEME.bgSecondary,
+    backgroundColor: '#BCB0A0',
   },
   seed: {
     position: 'absolute',
@@ -544,9 +548,9 @@ const animStyles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 999,
-    backgroundColor: THEME.accent,
+    backgroundColor: '#5A534B',
     borderWidth: 2,
-    borderColor: THEME.accentDark,
+    borderColor: '#5A534B',
   },
   stem: {
     position: 'absolute',
@@ -554,7 +558,7 @@ const animStyles = StyleSheet.create({
     width: 8,
     height: 68,
     borderRadius: 8,
-    backgroundColor: THEME.accentDark,
+    backgroundColor: THEME.groundDark,
   },
   canopy: {
     position: 'absolute',
@@ -585,14 +589,14 @@ const illusStyles = StyleSheet.create({
     bottom: 0,
     height: 86,
     width: '100%',
-    backgroundColor: THEME.bgSecondary,
+    backgroundColor: THEME.groundDark,
   },
   soilLip: {
     position: 'absolute',
     bottom: 76,
     height: 12,
     width: '100%',
-    backgroundColor: THEME.accent,
+    backgroundColor: THEME.ground,
   },
   seed: {
     position: 'absolute',
@@ -600,9 +604,9 @@ const illusStyles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 999,
-    backgroundColor: THEME.accent,
+    backgroundColor: THEME.groundDark,
     borderWidth: 2,
-    borderColor: THEME.accentDark,
+    borderColor: THEME.groundDark,
   },
   leafLeft: {
     position: 'absolute',
@@ -613,7 +617,7 @@ const illusStyles = StyleSheet.create({
     borderTopLeftRadius: 18,
     borderBottomLeftRadius: 18,
     borderTopRightRadius: 18,
-    backgroundColor: THEME.accent,
+    backgroundColor: THEME.accenLight,
     transform: [{ rotate: '-18deg' }],
   },
   leafRight: {
@@ -635,9 +639,9 @@ const illusStyles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 999,
-    backgroundColor: THEME.bgSecondary,
+    backgroundColor: '#FAD044',
     borderWidth: 2,
-    borderColor: THEME.accent,
+    borderColor: "#FAD044",
   },
   waterDrop1: {
     position: 'absolute',
@@ -646,7 +650,7 @@ const illusStyles = StyleSheet.create({
     width: 12,
     height: 18,
     borderRadius: 999,
-    backgroundColor: THEME.accent,
+    backgroundColor: '#11D0FF',
     opacity: 0.85,
     transform: [{ rotate: '12deg' }],
   },
@@ -657,7 +661,7 @@ const illusStyles = StyleSheet.create({
     width: 10,
     height: 16,
     borderRadius: 999,
-    backgroundColor: THEME.accent,
+    backgroundColor: '#55DEFF',
     opacity: 0.75,
     transform: [{ rotate: '-8deg' }],
   },
@@ -702,7 +706,7 @@ const illusStyles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     height: 110,
-    backgroundColor: THEME.accent,
+    backgroundColor: THEME.ground,
   },
   treeTrunk: {
     position: 'absolute',
@@ -710,7 +714,7 @@ const illusStyles = StyleSheet.create({
     width: 14,
     height: 74,
     borderRadius: 10,
-    backgroundColor: THEME.accentDark,
+    backgroundColor: THEME.groundDark,
   },
   treeTop: {
     position: 'absolute',
@@ -718,7 +722,7 @@ const illusStyles = StyleSheet.create({
     width: 110,
     height: 78,
     borderRadius: 44,
-    backgroundColor: THEME.accent,
+    backgroundColor: THEME.accentDark,
     borderWidth: 2,
     borderColor: THEME.accentDark,
   },
