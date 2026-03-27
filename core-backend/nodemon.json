@@ -1,0 +1,7 @@
+{
+  "watch": ["build"],
+  "ext": "js,json",
+  "delay": 200,
+  "exec": "node build/app.js"
+}
+
