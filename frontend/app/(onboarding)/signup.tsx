@@ -76,8 +76,7 @@ export default function SignupScreen() {
     try {
       // TODO: Replace with real sign-up call (backend/Firebase/Supabase/etc.)
       await new Promise((r) => setTimeout(r, 650));
-      Alert.alert('Account created', 'Your account has been created (stub).');
-      router.replace('/login');
+      router.replace('/set-goals');
     } catch {
       Alert.alert('Sign up failed', 'Please try again.');
     } finally {

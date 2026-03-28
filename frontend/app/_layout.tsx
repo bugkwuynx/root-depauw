@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 
 export default function RootLayout() {
-    const isLoggedIn = false;
+    const isLoggedIn = true;
 
     return (
         <Stack screenOptions={{ headerShown: false }}>
@@ -10,6 +10,8 @@ export default function RootLayout() {
             ) : (
                 <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
             )}
+            <Stack.Screen name="setting-view" options={{ headerShown: false }} />
+            <Stack.Screen name="calendar-view" options={{ headerShown: false }} />
         </Stack>
     )
 }
