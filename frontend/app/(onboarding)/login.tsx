@@ -207,7 +207,7 @@ export default function LoginScreen() {
 
             <Text style={styles.footerText}>
               New here?{' '}
-              <Link href="/signup" style={styles.footerLink}>
+              <Link href="./signup" style={styles.footerLink}>
                 Create an account
               </Link>
             </Text>

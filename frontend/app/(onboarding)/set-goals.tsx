@@ -91,7 +91,7 @@ export default function SetGoalsScreen() {
         preferEmptyGoalsList: goals.length === 0,
       });
       await new Promise((r) => setTimeout(r, 200));
-      router.replace('/login');
+      router.replace('./login');
     } finally {
       setIsSaving(false);
     }

@@ -76,7 +76,7 @@ export default function SignupScreen() {
     try {
       // TODO: Replace with real sign-up call (backend/Firebase/Supabase/etc.)
       await new Promise((r) => setTimeout(r, 650));
-      router.replace('/set-goals');
+      router.replace('./set-goals');
     } catch {
       Alert.alert('Sign up failed', 'Please try again.');
     } finally {
@@ -230,7 +230,7 @@ export default function SignupScreen() {
 
             <Text style={styles.footerText}>
               Already have an account?{' '}
-              <Link href="/login" style={styles.footerLink}>
+              <Link href="./login" style={styles.footerLink}>
                 Log in
               </Link>
             </Text>
