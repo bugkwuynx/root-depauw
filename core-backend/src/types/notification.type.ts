@@ -9,6 +9,6 @@ export interface Notification {
     title: string;
     message: string;
     read: boolean;
-    scheduledAt: string;
+    scheduledAt: Date;
     sentAt: Date;
 }
