@@ -8,7 +8,7 @@ cd frontend
 ```
 
 ```
-npm run start
+npx expo start --tunnel
 ```
 
 ### Folder Structure

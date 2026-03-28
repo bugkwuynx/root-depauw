@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+<<<<<<< HEAD
 
 export default function RootLayout() {
     const isLoggedIn = true;
@@ -15,3 +16,17 @@ export default function RootLayout() {
         </Stack>
     )
 }
+=======
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+
+export default function RootLayout() {
+  return (
+    <>
+      <StatusBar style="dark" />
+      <Stack screenOptions={{ headerShown: false }} />
+    </>
+  );
+}
+>>>>>>> 0dde567275ffe0ee0918a84b9c449a790201b820
