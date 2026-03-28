@@ -1,10 +1,4 @@
-export enum TreePhase {
-  Seed = "seed",
-  Seedling = "seedling",
-  Sapling = "sapling",
-  Young = "young",
-  Full = "full"
-}
+import { TreePhase } from './forest.type.js';
 
 export interface GameState {
   coins: number;
