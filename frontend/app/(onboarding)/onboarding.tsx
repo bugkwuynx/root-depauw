@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -13,15 +14,18 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import seedsIllustration from '@/assets/onboarding/seed.png';
+import smallTreeIllustration from '@/assets/onboarding/smallTree1.png';
+import largeTreeIllustration from '@/assets/onboarding/forest.png';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const THEME = {
   bgPrimary: '#F3FAED',
   bgSecondary: '#E1F0E3',
-  accenLight: '#92BFA2',
   accent: '#83BF99',
   accentDark: '#5FAD89',
   ground: '#BCB0A0',
-  groundDark: '#5A534B'
+  groundDark: '#73583A'
 
 } as const;
 
@@ -259,11 +263,12 @@ function SeedToTreeAnimation() {
 function PlantIllustration() {
   return (
     <View style={illusStyles.frame}>
-      <View style={illusStyles.soil} />
-      <View style={illusStyles.soilLip} />
-      <View style={illusStyles.seed} />
-      <View style={illusStyles.leafLeft} />
-      <View style={illusStyles.leafRight} />
+      <Image
+        source={seedsIllustration}
+        style={illusStyles.illusFillImage}
+        contentFit="cover"
+        accessibilityLabel="Seed sprout with two leaves"
+      />
     </View>
   );
 }
@@ -271,14 +276,12 @@ function PlantIllustration() {
 function NurtureIllustration() {
   return (
     <View style={illusStyles.frame}>
-      <View style={illusStyles.sun} />
-      <View style={illusStyles.waterDrop1} />
-      <View style={illusStyles.waterDrop2} />
-      <View style={illusStyles.waterDrop3} />
-      <View style={illusStyles.smallStem} />
-      <View style={illusStyles.smallCanopy} />
-      <View style={illusStyles.soil} />
-      <View style={illusStyles.soilLip} />
+      <Image
+        source={smallTreeIllustration}
+        style={illusStyles.illusFillImage}
+        contentFit="cover"
+        accessibilityLabel="Small tree under the sun"
+      />
     </View>
   );
 }
@@ -286,10 +289,12 @@ function NurtureIllustration() {
 function GrowIllustration() {
   return (
     <View style={illusStyles.frame}>
-      <View style={illusStyles.forestBack} />
-      <View style={illusStyles.treeTrunk} />
-      <View style={illusStyles.treeTop} />
-      <View style={illusStyles.forestFront} />
+      <Image
+        source={largeTreeIllustration}
+        style={illusStyles.illusFillImage}
+        contentFit="cover"
+        accessibilityLabel="Large tree under the sun"
+      />
     </View>
   );
 }
@@ -584,147 +589,12 @@ const illusStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  soil: {
+  illusFillImage: {
     position: 'absolute',
-    bottom: 0,
-    height: 86,
-    width: '100%',
-    backgroundColor: THEME.groundDark,
-  },
-  soilLip: {
-    position: 'absolute',
-    bottom: 76,
-    height: 12,
-    width: '100%',
-    backgroundColor: THEME.ground,
-  },
-  seed: {
-    position: 'absolute',
-    bottom: 78,
-    width: 18,
-    height: 18,
-    borderRadius: 999,
-    backgroundColor: THEME.groundDark,
-    borderWidth: 2,
-    borderColor: THEME.groundDark,
-  },
-  leafLeft: {
-    position: 'absolute',
-    bottom: 104,
-    left: 126,
-    width: 34,
-    height: 18,
-    borderTopLeftRadius: 18,
-    borderBottomLeftRadius: 18,
-    borderTopRightRadius: 18,
-    backgroundColor: THEME.accenLight,
-    transform: [{ rotate: '-18deg' }],
-  },
-  leafRight: {
-    position: 'absolute',
-    bottom: 104,
-    right: 126,
-    width: 34,
-    height: 18,
-    borderTopLeftRadius: 18,
-    borderBottomRightRadius: 18,
-    borderTopRightRadius: 18,
-    backgroundColor: THEME.accentDark,
-    transform: [{ rotate: '18deg' }],
-  },
-  sun: {
-    position: 'absolute',
-    top: 22,
-    right: 26,
-    width: 42,
-    height: 42,
-    borderRadius: 999,
-    backgroundColor: '#FAD044',
-    borderWidth: 2,
-    borderColor: "#FAD044",
-  },
-  waterDrop1: {
-    position: 'absolute',
-    top: 58,
-    left: 70,
-    width: 12,
-    height: 18,
-    borderRadius: 999,
-    backgroundColor: '#11D0FF',
-    opacity: 0.85,
-    transform: [{ rotate: '12deg' }],
-  },
-  waterDrop2: {
-    position: 'absolute',
-    top: 78,
-    left: 92,
-    width: 10,
-    height: 16,
-    borderRadius: 999,
-    backgroundColor: '#55DEFF',
-    opacity: 0.75,
-    transform: [{ rotate: '-8deg' }],
-  },
-  waterDrop3: {
-    position: 'absolute',
-    top: 64,
-    left: 110,
-    width: 8,
-    height: 14,
-    borderRadius: 999,
-    backgroundColor: THEME.accent,
-    opacity: 0.65,
-    transform: [{ rotate: '4deg' }],
-  },
-  smallStem: {
-    position: 'absolute',
-    bottom: 86,
-    width: 8,
-    height: 52,
-    borderRadius: 8,
-    backgroundColor: THEME.accentDark,
-  },
-  smallCanopy: {
-    position: 'absolute',
-    bottom: 128,
-    width: 64,
-    height: 54,
-    borderRadius: 28,
-    backgroundColor: THEME.accent,
-    borderWidth: 2,
-    borderColor: THEME.accentDark,
-  },
-  forestBack: {
-    position: 'absolute',
-    bottom: 60,
-    width: '100%',
-    height: 110,
-    backgroundColor: THEME.bgSecondary,
-  },
-  forestFront: {
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
-    height: 110,
-    backgroundColor: THEME.ground,
-  },
-  treeTrunk: {
-    position: 'absolute',
-    bottom: 70,
-    width: 14,
-    height: 74,
-    borderRadius: 10,
-    backgroundColor: THEME.groundDark,
-  },
-  treeTop: {
-    position: 'absolute',
-    bottom: 126,
-    width: 110,
-    height: 78,
-    borderRadius: 44,
-    backgroundColor: THEME.accentDark,
-    borderWidth: 2,
-    borderColor: THEME.accentDark,
+    left: 40,
+    top: 0,
+    width: 200,
+    height: 210,
   },
 });
 
