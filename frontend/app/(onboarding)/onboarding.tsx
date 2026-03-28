@@ -1,7 +1,7 @@
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import React from 'react';
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import React from "react";
 import {
   Animated,
   Dimensions,
@@ -11,22 +11,21 @@ import {
   Text,
   type TextStyle,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import seedsIllustration from '@/assets/onboarding/seed.png';
-import smallTreeIllustration from '@/assets/onboarding/smallTree1.png';
-import largeTreeIllustration from '@/assets/onboarding/forest.png';
+import seedsIllustration from "@/assets/onboarding/seed.png";
+import smallTreeIllustration from "@/assets/onboarding/smallTree1.png";
+import largeTreeIllustration from "@/assets/onboarding/forest.png";
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const THEME = {
-  bgPrimary: '#F3FAED',
-  bgSecondary: '#E1F0E3',
-  accent: '#83BF99',
-  accentDark: '#5FAD89',
-  ground: '#BCB0A0',
-  groundDark: '#73583A'
-
+  bgPrimary: "#F3FAED",
+  bgSecondary: "#E1F0E3",
+  accent: "#83BF99",
+  accentDark: "#5FAD89",
+  ground: "#BCB0A0",
+  groundDark: "#73583A",
 } as const;
 
 type HowItWorksSlide = {
@@ -38,21 +37,21 @@ type HowItWorksSlide = {
 
 const SLIDES: HowItWorksSlide[] = [
   {
-    key: 'plant',
-    title: 'Plant habits like seeds',
-    subtitle: 'Choose habits you want to grow',
+    key: "plant",
+    title: "Plant habits like seeds",
+    subtitle: "Choose habits you want to grow",
     renderIllustration: () => <PlantIllustration />,
   },
   {
-    key: 'nurture',
-    title: 'Complete daily tasks',
-    subtitle: 'Water your tree by showing up every day',
+    key: "nurture",
+    title: "Complete daily tasks",
+    subtitle: "Water your tree by showing up every day",
     renderIllustration: () => <NurtureIllustration />,
   },
   {
-    key: 'grow',
-    title: 'Watch your garden thrive',
-    subtitle: 'Consistency turns into visible growth',
+    key: "grow",
+    title: "Watch your garden thrive",
+    subtitle: "Consistency turns into visible growth",
     renderIllustration: () => <GrowIllustration />,
   },
 ];
@@ -60,11 +59,11 @@ const SLIDES: HowItWorksSlide[] = [
 export default function OnboardingScreen() {
   const router = useRouter();
   const scrollRef = React.useRef<ScrollView | null>(null);
-  const [mode, setMode] = React.useState<'welcome' | 'howItWorks'>('welcome');
+  const [mode, setMode] = React.useState<"welcome" | "howItWorks">("welcome");
   const [page, setPage] = React.useState(0);
 
   const goToHowItWorks = React.useCallback(() => {
-    setMode('howItWorks');
+    setMode("howItWorks");
     setPage(0);
     requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({ x: 0, animated: false });
@@ -85,7 +84,7 @@ export default function OnboardingScreen() {
       style={viewStyles.gradient}
     >
       <SafeAreaView style={viewStyles.safe}>
-        {mode === 'welcome' ? (
+        {mode === "welcome" ? (
           <View style={viewStyles.welcomeWrap}>
             <View style={viewStyles.illustrationCenter}>
               <SeedToTreeAnimation />
@@ -93,17 +92,29 @@ export default function OnboardingScreen() {
 
             <View style={viewStyles.brandBlock}>
               <Text style={textStyles.appName}>Root</Text>
-              <Text style={textStyles.title}>Grow Your Life, One Habit at a Time</Text>
-              <Text style={textStyles.subtitle}>Turn your daily actions into a thriving forest</Text>
+              <Text style={textStyles.title}>
+                Grow Your Life, One Habit at a Time
+              </Text>
+              <Text style={textStyles.subtitle}>
+                Turn your daily actions into a thriving forest
+              </Text>
             </View>
 
             <View style={viewStyles.ctaRow}>
-              <Pressable onPress={goToHowItWorks} style={viewStyles.primaryButton}>
+              <Pressable
+                onPress={goToHowItWorks}
+                style={viewStyles.primaryButton}
+              >
                 <Text style={textStyles.primaryButtonText}>Start Growing</Text>
               </Pressable>
 
-              <Pressable onPress={() => router.push('/login')} style={viewStyles.secondaryButton}>
-                <Text style={textStyles.secondaryButtonText}>I already have an account</Text>
+              <Pressable
+                onPress={() => router.push("/home")}
+                style={viewStyles.secondaryButton}
+              >
+                <Text style={textStyles.secondaryButtonText}>
+                  I already have an account
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -112,7 +123,7 @@ export default function OnboardingScreen() {
             <View style={viewStyles.topBar}>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => setMode('welcome')}
+                onPress={() => setMode("welcome")}
                 style={viewStyles.backChip}
               >
                 <Text style={textStyles.backChipText}>Back</Text>
@@ -134,7 +145,9 @@ export default function OnboardingScreen() {
             >
               {SLIDES.map((s) => (
                 <View key={s.key} style={viewStyles.slide}>
-                  <View style={viewStyles.slideIllustration}>{s.renderIllustration()}</View>
+                  <View style={viewStyles.slideIllustration}>
+                    {s.renderIllustration()}
+                  </View>
                   <Text style={textStyles.slideTitle}>{s.title}</Text>
                   <Text style={textStyles.slideSubtitle}>{s.subtitle}</Text>
                 </View>
@@ -145,11 +158,17 @@ export default function OnboardingScreen() {
               <Dots count={SLIDES.length} active={page} />
               <View style={viewStyles.footerButtons}>
                 <Pressable
-                  style={[viewStyles.ghostButton, page === 0 && viewStyles.ghostButtonDisabled]}
+                  style={[
+                    viewStyles.ghostButton,
+                    page === 0 && viewStyles.ghostButtonDisabled,
+                  ]}
                   disabled={page === 0}
                   onPress={() => {
                     const next = Math.max(0, page - 1);
-                    scrollRef.current?.scrollTo({ x: next * SCREEN_WIDTH, animated: true });
+                    scrollRef.current?.scrollTo({
+                      x: next * SCREEN_WIDTH,
+                      animated: true,
+                    });
                   }}
                 >
                   <Text
@@ -167,14 +186,17 @@ export default function OnboardingScreen() {
                   onPress={() => {
                     if (page < SLIDES.length - 1) {
                       const next = page + 1;
-                      scrollRef.current?.scrollTo({ x: next * SCREEN_WIDTH, animated: true });
+                      scrollRef.current?.scrollTo({
+                        x: next * SCREEN_WIDTH,
+                        animated: true,
+                      });
                       return;
                     }
-                    router.push('/signup');
+                    router.push("/signup");
                   }}
                 >
                   <Text style={textStyles.primaryButtonTextSmall}>
-                    {page < SLIDES.length - 1 ? 'Next' : 'Get started'}
+                    {page < SLIDES.length - 1 ? "Next" : "Get started"}
                   </Text>
                 </Pressable>
               </View>
@@ -197,27 +219,76 @@ function SeedToTreeAnimation() {
     const loop = Animated.loop(
       Animated.sequence([
         Animated.parallel([
-          Animated.timing(seedScale, { toValue: 0.85, duration: 550, useNativeDriver: true }),
-          Animated.timing(seedOpacity, { toValue: 0.85, duration: 550, useNativeDriver: true }),
+          Animated.timing(seedScale, {
+            toValue: 0.85,
+            duration: 550,
+            useNativeDriver: true,
+          }),
+          Animated.timing(seedOpacity, {
+            toValue: 0.85,
+            duration: 550,
+            useNativeDriver: true,
+          }),
         ]),
         Animated.parallel([
-          Animated.timing(seedScale, { toValue: 0.0, duration: 500, useNativeDriver: true }),
-          Animated.timing(seedOpacity, { toValue: 0.0, duration: 500, useNativeDriver: true }),
-          Animated.timing(stemScaleY, { toValue: 1, duration: 850, useNativeDriver: true }),
+          Animated.timing(seedScale, {
+            toValue: 0.0,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(seedOpacity, {
+            toValue: 0.0,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(stemScaleY, {
+            toValue: 1,
+            duration: 850,
+            useNativeDriver: true,
+          }),
         ]),
         Animated.parallel([
-          Animated.timing(canopyOpacity, { toValue: 1, duration: 450, useNativeDriver: true }),
-          Animated.spring(canopyScale, { toValue: 1, useNativeDriver: true, speed: 18, bounciness: 8 }),
+          Animated.timing(canopyOpacity, {
+            toValue: 1,
+            duration: 450,
+            useNativeDriver: true,
+          }),
+          Animated.spring(canopyScale, {
+            toValue: 1,
+            useNativeDriver: true,
+            speed: 18,
+            bounciness: 8,
+          }),
         ]),
         Animated.delay(700),
         Animated.parallel([
-          Animated.timing(seedScale, { toValue: 1, duration: 1, useNativeDriver: true }),
-          Animated.timing(seedOpacity, { toValue: 1, duration: 1, useNativeDriver: true }),
-          Animated.timing(stemScaleY, { toValue: 0, duration: 1, useNativeDriver: true }),
-          Animated.timing(canopyScale, { toValue: 0, duration: 1, useNativeDriver: true }),
-          Animated.timing(canopyOpacity, { toValue: 0, duration: 1, useNativeDriver: true }),
+          Animated.timing(seedScale, {
+            toValue: 1,
+            duration: 1,
+            useNativeDriver: true,
+          }),
+          Animated.timing(seedOpacity, {
+            toValue: 1,
+            duration: 1,
+            useNativeDriver: true,
+          }),
+          Animated.timing(stemScaleY, {
+            toValue: 0,
+            duration: 1,
+            useNativeDriver: true,
+          }),
+          Animated.timing(canopyScale, {
+            toValue: 0,
+            duration: 1,
+            useNativeDriver: true,
+          }),
+          Animated.timing(canopyOpacity, {
+            toValue: 0,
+            duration: 1,
+            useNativeDriver: true,
+          }),
         ]),
-      ])
+      ]),
     );
 
     loop.start();
@@ -305,7 +376,10 @@ function Dots({ count, active }: { count: number; active: number }) {
       {Array.from({ length: count }).map((_, i) => (
         <View
           key={i}
-          style={[viewStyles.dot, i === active ? viewStyles.dotActive : viewStyles.dotInactive]}
+          style={[
+            viewStyles.dot,
+            i === active ? viewStyles.dotActive : viewStyles.dotInactive,
+          ]}
         />
       ))}
     </View>
@@ -319,14 +393,14 @@ const viewStyles = StyleSheet.create({
   welcomeWrap: {
     flex: 1,
     paddingHorizontal: 22,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     paddingTop: 18,
     paddingBottom: 24,
   },
   illustrationCenter: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: 18,
   },
   brandBlock: {
@@ -340,8 +414,8 @@ const viewStyles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 16,
     backgroundColor: THEME.accentDark,
-    alignItems: 'center',
-    shadowColor: '#000',
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOpacity: 0.18,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
@@ -351,7 +425,7 @@ const viewStyles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 16,
     backgroundColor: THEME.bgPrimary,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 1,
     borderColor: THEME.accent,
   },
@@ -363,9 +437,9 @@ const viewStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   backChip: {
     paddingVertical: 8,
@@ -375,14 +449,14 @@ const viewStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: THEME.accent,
     width: 60,
-    alignItems: 'center',
+    alignItems: "center",
   },
   pagerContent: {},
   slide: {
     width: SCREEN_WIDTH,
     paddingHorizontal: 22,
     paddingTop: 18,
-    alignItems: 'center',
+    alignItems: "center",
   },
   slideIllustration: {
     marginTop: 14,
@@ -394,8 +468,8 @@ const viewStyles = StyleSheet.create({
     paddingTop: 10,
   },
   dotsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
     gap: 8,
     paddingBottom: 12,
   },
@@ -412,8 +486,8 @@ const viewStyles = StyleSheet.create({
     backgroundColor: THEME.accent,
   },
   footerButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     gap: 12,
   },
   ghostButton: {
@@ -423,7 +497,7 @@ const viewStyles = StyleSheet.create({
     backgroundColor: THEME.bgPrimary,
     borderWidth: 1,
     borderColor: THEME.accent,
-    alignItems: 'center',
+    alignItems: "center",
   },
   ghostButtonDisabled: {
     opacity: 0.55,
@@ -433,7 +507,7 @@ const viewStyles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 16,
     backgroundColor: THEME.accentDark,
-    alignItems: 'center',
+    alignItems: "center",
   },
 });
 
@@ -456,15 +530,15 @@ const textStyles = StyleSheet.create<TextStyleMap>({
   appName: {
     color: THEME.accentDark,
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: "800",
     letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   title: {
     marginTop: 10,
     fontSize: 30,
     lineHeight: 34,
-    fontWeight: '900',
+    fontWeight: "900",
     color: THEME.accentDark,
     letterSpacing: -0.6,
   },
@@ -473,57 +547,57 @@ const textStyles = StyleSheet.create<TextStyleMap>({
     fontSize: 15,
     lineHeight: 20,
     color: THEME.accentDark,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   primaryButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
+    color: "#FFFFFF",
+    fontWeight: "900",
     fontSize: 16,
     letterSpacing: 0.2,
   },
   secondaryButtonText: {
     color: THEME.accentDark,
-    fontWeight: '900',
+    fontWeight: "900",
     fontSize: 14,
   },
   backChipText: {
     color: THEME.accentDark,
-    fontWeight: '900',
+    fontWeight: "900",
     fontSize: 13,
   },
   topBarTitle: {
     color: THEME.accentDark,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: -0.3,
     fontSize: 16,
   },
   slideTitle: {
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: "900",
     color: THEME.accentDark,
-    textAlign: 'center',
+    textAlign: "center",
     letterSpacing: -0.4,
   },
   slideSubtitle: {
     marginTop: 10,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: "800",
     color: THEME.accentDark,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 19,
     maxWidth: 320,
   },
   ghostButtonText: {
     color: THEME.accentDark,
-    fontWeight: '900',
+    fontWeight: "900",
     fontSize: 14,
   },
   ghostButtonTextDisabled: {
     color: THEME.accent,
   },
   primaryButtonTextSmall: {
-    color: '#FFFFFF',
-    fontWeight: '900',
+    color: "#FFFFFF",
+    fontWeight: "900",
     fontSize: 14,
   },
 });
@@ -536,29 +610,29 @@ const animStyles = StyleSheet.create({
     backgroundColor: THEME.bgPrimary,
     borderWidth: 1,
     borderColor: THEME.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
   },
   ground: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     height: 78,
-    width: '100%',
-    backgroundColor: '#BCB0A0',
+    width: "100%",
+    backgroundColor: "#BCB0A0",
   },
   seed: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 62,
     width: 18,
     height: 18,
     borderRadius: 999,
-    backgroundColor: '#5A534B',
+    backgroundColor: "#5A534B",
     borderWidth: 2,
-    borderColor: '#5A534B',
+    borderColor: "#5A534B",
   },
   stem: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 72,
     width: 8,
     height: 68,
@@ -566,7 +640,7 @@ const animStyles = StyleSheet.create({
     backgroundColor: THEME.groundDark,
   },
   canopy: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 120,
     width: 92,
     height: 72,
@@ -585,16 +659,15 @@ const illusStyles = StyleSheet.create({
     backgroundColor: THEME.bgPrimary,
     borderWidth: 1,
     borderColor: THEME.accent,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
   },
   illusFillImage: {
-    position: 'absolute',
+    position: "absolute",
     left: 40,
     top: 0,
     width: 200,
     height: 210,
   },
 });
-
