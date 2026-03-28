@@ -230,8 +230,7 @@ export default function TasksScreen() {
             </View>
           )}
           <Pressable
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            onPress={() => router.push('/trees' as any)}
+            onPress={() => router.push('/trees')}
             style={styles.treesBtn}
             hitSlop={8}
           >
