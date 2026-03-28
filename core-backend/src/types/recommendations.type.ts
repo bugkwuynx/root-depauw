@@ -1,7 +1,7 @@
 export interface Recommendation {
     title: string;
     description: string;
-    types: string[];
+    goals: string[];
     confidence: number;
 }
 
