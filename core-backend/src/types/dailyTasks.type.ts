@@ -1,4 +1,4 @@
-export default interface Task {
+export interface Task {
     taskId: string;
     title: string;
     type: string;
@@ -6,7 +6,7 @@ export default interface Task {
     isCompleted: boolean;
 }
 
-export default interface DailyTask {
+export interface DailyTask {
     date: string;
     tasks: Task[];
 }
