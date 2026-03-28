@@ -7,6 +7,6 @@ export interface Task {
 }
 
 export interface DailyTask {
-    date: string;
+    date: Date;
     tasks: Task[];
 }
