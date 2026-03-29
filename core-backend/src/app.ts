@@ -13,7 +13,6 @@ app.get('/', (req, res)=>
      res.send('Hello World');
 });
 
- app.listen(port, ()=>{
-     console.log(
-`Connected successfully on port ${port}`)
+app.listen(port, ()=>{
+     console.log(`Connected successfully on port ${port}`);
 });
