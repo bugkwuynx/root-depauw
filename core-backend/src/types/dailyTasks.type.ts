@@ -6,7 +6,7 @@ export interface Task {
     isCompleted: boolean;
 }
 
-export default interface DailyTask {
-    date: string;
+export interface DailyTask {
+    date: Date;
     tasks: Task[];
 }
