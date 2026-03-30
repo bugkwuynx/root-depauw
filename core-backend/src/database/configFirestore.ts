@@ -1,7 +1,7 @@
 import {initializeApp, cert, type App, getApps, getApp} from 'firebase-admin/app';
 import {getFirestore, type Firestore} from 'firebase-admin/firestore';
 
-import serviceAccountCredentials from '../../credentials/service-account-file.json' with {type: 'json'};
+import serviceAccountCredentials from '../credentials/service-account-file.json' with {type: 'json'};
 
 const intializeAppOptions = () => {
     if (getApps.length === 0) {
