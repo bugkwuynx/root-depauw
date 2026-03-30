@@ -8,6 +8,7 @@ export enum TreePhase {
 
 export default interface Tree {
     name: string;
+    treeId: number;
     phases: TreePhase[];
     waterRequiredPerPhase: number;
     totalWaterRequired: number;
