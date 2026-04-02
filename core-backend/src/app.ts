@@ -5,8 +5,13 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+import recommendationsRouter from "./routes/recommendations.route.js";
+
 const app = express();
 const port = 5000;
+
+app.use(express.json());
+app.use('/recommendations', recommendationsRouter);
 
 app.get('/', (req, res)=>
 {
