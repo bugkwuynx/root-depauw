@@ -3,6 +3,6 @@ import { Router } from "express";
 
 const recommendationsRouter = Router();
 
-recommendationsRouter.post("/", getRecommendationsController);
+recommendationsRouter.post("/:userId", getRecommendationsController);
 
 export default recommendationsRouter;

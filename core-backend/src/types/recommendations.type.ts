@@ -39,5 +39,8 @@ export interface GetRecommendationsCollectionServiceRequest {
 }
 
 export interface GetRecommendationsControllerRequest extends Request {
+    params: {
+        userId: string;
+    }
     body: GetRecommendationsCollectionServiceRequest;
 }
