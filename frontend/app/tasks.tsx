@@ -216,6 +216,13 @@ export default function TasksScreen() {
       >
         {/* ── Header ── */}
         <View style={styles.header}>
+          <Pressable
+            onPress={() => router.back()}
+            style={styles.backBtn}
+            hitSlop={8}
+          >
+            <Ionicons name="chevron-back" size={22} color="#2D5A3D" />
+          </Pressable>
           <View style={styles.headerIconWrap}>
             <Text style={styles.headerIcon}>🌿</Text>
           </View>
@@ -230,13 +237,6 @@ export default function TasksScreen() {
               </Text>
             </View>
           )}
-          <Pressable
-            onPress={() => router.back()}
-            style={styles.backBtn}
-            hitSlop={8}
-          >
-            <Ionicons name="chevron-back" size={22} color="#2D5A3D" />
-          </Pressable>
         </View>
 
         <ScrollView

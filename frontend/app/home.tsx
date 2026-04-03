@@ -3,11 +3,12 @@ import { useRouter } from 'expo-router';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
@@ -45,21 +46,11 @@ const MOCK_GAME_STATE = {
     totalWater: 18,
     createdAt: '2025-03-01',
   },
-  completedTrees: [
-    { id: 'tree-000', phase: 'full_grown' as TreePhase, waterUnits: 7, totalWater: 35, createdAt: '2025-01-15', completedAt: '2025-02-28' },
-  ],
   coins: 340,
   waterToday: false,
-  streak: {
-    currentStreak: 5,
-    zeroStreak: 0,
-    longestStreak: 12,
-  },
+  streak: { currentStreak: 5, zeroStreak: 0, longestStreak: 12 },
   fertilizers: 2,
 };
-
-// First 3 daily tasks shown as incomplete on home preview
-const PREVIEW_TASKS = mockDailyTasks.slice(0, 3);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Nav items
@@ -87,15 +78,18 @@ function TreeVisual({ phase, waterUnits, name }: { phase: TreePhase; waterUnits:
 
   return (
     <View style={styles.treeContainer}>
-      <View style={styles.treeEmojiWrap}>
-        <Text style={styles.treeEmoji}>{treeEmojis[phase]}</Text>
-      </View>
-
-      <View style={styles.treeInfo}>
+      {/* Name + phase at top */}
+      <View style={styles.treeTopInfo}>
         <Text style={styles.treeName}>{name}</Text>
         <Text style={styles.treePhaseLabel}>{PHASE_LABELS[phase]}</Text>
       </View>
 
+      {/* Emoji centered in remaining space */}
+      <View style={styles.treeEmojiWrap}>
+        <Text style={styles.treeEmoji}>{treeEmojis[phase]}</Text>
+      </View>
+
+      {/* Water bar at bottom */}
       <View style={styles.treeBottom}>
         <View style={styles.waterMeterRow}>
           {Array.from({ length: WATER_PER_PHASE }).map((_, i) => (
@@ -123,12 +117,39 @@ function TreeVisual({ phase, waterUnits, name }: { phase: TreePhase; waterUnits:
 // Home Screen
 // ─────────────────────────────────────────────────────────────────────────────
 
+const ALL_TASKS = mockDailyTasks;
+
 export default function HomeScreen() {
   const [gameState] = useState(MOCK_GAME_STATE);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  // IDs of completed tasks
+  const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
+  // IDs currently shown in the preview (up to 3 at a time)
+  const [visibleTaskIds, setVisibleTaskIds] = useState<string[]>(
+    ALL_TASKS.slice(0, 3).map((t) => t.id),
+  );
+
+  const visibleTasks = visibleTaskIds
+    .map((id) => ALL_TASKS.find((t) => t.id === id)!)
+    .filter(Boolean);
+
+  const allTasksDone = completedTaskIds.size > 0 && visibleTasks.length === 0;
+
+  const handleCompleteTask = (id: string) => {
+    const newCompleted = new Set([...completedTaskIds, id]);
+    setCompletedTaskIds(newCompleted);
+
+    const newVisible = visibleTaskIds.filter((tid) => tid !== id);
+    const nextTask = ALL_TASKS.find(
+      (t) => !newCompleted.has(t.id) && !newVisible.includes(t.id),
+    );
+    setVisibleTaskIds(nextTask ? [...newVisible, nextTask.id] : newVisible);
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* ── Header ── */}
       <View style={styles.header}>
         <View>
@@ -144,50 +165,64 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.headerStats}>
-          {/* Streak */}
           <View style={styles.statBadge}>
             <Ionicons name="flame" size={16} color={GameColors.crossText} />
             <Text style={styles.statText}>{gameState.streak.currentStreak}</Text>
           </View>
-
-          {/* Coins */}
           <View style={styles.coinBadge}>
             <FontAwesome5 name="coins" size={13} color={GameColors.coinText} />
             <Text style={styles.coinText}>{gameState.coins}</Text>
           </View>
-
-          {/* Fertilizer */}
           <View style={styles.fertBadge}>
-            <Ionicons name="leaf-outline" size={15} color="#3D7A3A" />
+            <Image
+              source={require('../assets/icons/fertilizer.png')}
+              style={styles.fertIcon}
+            />
             <Text style={styles.fertText}>{gameState.fertilizers}</Text>
           </View>
         </View>
       </View>
 
-      {/* ── Main content (tree + tasks preview) ── */}
+      {/* ── Main content ── */}
       <View style={styles.mainContent}>
-        {/* Tree */}
         <TreeVisual
           phase={gameState.currentTree.phase}
           waterUnits={gameState.currentTree.waterUnits}
           name={gameState.currentTree.name}
         />
 
-        {/* Incomplete tasks preview */}
+        {/* Today's tasks preview */}
         <View style={styles.tasksPreview}>
-          <Text style={styles.previewLabel}>Up Next</Text>
-          {PREVIEW_TASKS.map((task) => (
-            <View key={task.id} style={styles.taskRow}>
-              <View style={styles.taskCircle} />
-              <Text style={styles.taskEmoji}>{task.emoji}</Text>
-              <Text style={styles.taskTitle} numberOfLines={1}>{task.title}</Text>
-            </View>
-          ))}
+          <Text style={styles.previewLabel}>Today's Tasks</Text>
+          <View style={styles.tasksList}>
+            {allTasksDone ? (
+              <View style={styles.allDoneWrap}>
+                <Text style={styles.allDoneText}>
+                  All tasks are complete, amazing job! 🎉
+                </Text>
+              </View>
+            ) : (
+              visibleTasks.map((task) => (
+                <TouchableOpacity
+                  key={task.id}
+                  style={styles.taskRow}
+                  onPress={() => handleCompleteTask(task.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.taskCircle} />
+                  <Text style={styles.taskEmoji}>{task.emoji}</Text>
+                  <Text style={styles.taskTitle} numberOfLines={1}>
+                    {task.title}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
         </View>
       </View>
 
       {/* ── Bottom nav bar ── */}
-      <View style={styles.navBar}>
+      <View style={[styles.navBar, { paddingBottom: insets.bottom + 8 }]}>
         {NAV_ITEMS.map(({ label, icon, route }) => (
           <TouchableOpacity
             key={label}
@@ -227,11 +262,13 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: GameColors.textDark,
+    letterSpacing: -0.3,
   },
   dateText: {
     fontSize: 13,
     color: GameColors.textMid,
     marginTop: 2,
+    letterSpacing: 0.1,
   },
   headerStats: {
     flexDirection: 'row',
@@ -269,21 +306,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: GameColors.coinText,
   },
+  // Pastel brown fertilizer badge
   fertBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F9EE',
+    backgroundColor: '#F5E8D0',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 16,
-    gap: 4,
+    gap: 5,
     borderWidth: 1,
-    borderColor: '#A8D8A0',
+    borderColor: '#D4A96A',
+  },
+  fertIcon: {
+    width: 16,
+    height: 16,
   },
   fertText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#3D7A3A',
+    color: '#7C5026',
   },
 
   // ── Main content ─────────────────────────────────────────────────────────────
@@ -293,7 +335,7 @@ const styles = StyleSheet.create({
 
   // ── Tree ─────────────────────────────────────────────────────────────────────
   treeContainer: {
-    height: SCREEN_HEIGHT * 0.45,
+    height: SCREEN_HEIGHT * 0.48,
     alignItems: 'center',
     marginHorizontal: 20,
     marginTop: 8,
@@ -302,39 +344,42 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: GameColors.bgSection,
   },
+  // Name + phase pinned at top
+  treeTopInfo: {
+    alignItems: 'center',
+    paddingTop: 18,
+    gap: 5,
+  },
+  treeName: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: GameColors.textDark,
+    letterSpacing: 3,
+  },
+  treePhaseLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: GameColors.textMid,
+    letterSpacing: 3.5,
+    textTransform: 'uppercase',
+  },
+  // Emoji fills remaining height, centered
   treeEmojiWrap: {
-    flex: 75,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  treeInfo: {
-    flex: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  treeBottom: {
-    flex: 15,
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   treeEmoji: {
     fontSize: 160,
   },
-  treeName: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: GameColors.textDark,
-  },
-  treePhaseLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: GameColors.textMid,
-    marginTop: 2,
+  // Water bar sits at bottom with its own padding
+  treeBottom: {
+    alignItems: 'center',
+    paddingBottom: 18,
   },
   waterMeterRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: -10,
   },
   waterDrop: {
     width: 36,
@@ -351,49 +396,68 @@ const styles = StyleSheet.create({
     borderColor: '#9ECFFA',
   },
   waterLabel: {
-    marginTop: 16,
+    marginTop: 8,
     fontSize: 12,
     color: GameColors.textMid,
+    letterSpacing: 0.3,
   },
 
   // ── Tasks preview ─────────────────────────────────────────────────────────────
   tasksPreview: {
+    flex: 1,
     marginHorizontal: 20,
-    marginTop: 14,
+    marginTop: 16,
+    marginBottom: 8,
   },
   previewLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: GameColors.textMid,
     textTransform: 'uppercase',
-    letterSpacing: 0.9,
-    marginBottom: 8,
+    letterSpacing: 1.0,
+    marginBottom: 10,
+  },
+  tasksList: {
+    flex: 1,
+    justifyContent: 'space-evenly',
   },
   taskRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     backgroundColor: GameColors.bgSection,
-    borderRadius: 10,
-    marginBottom: 6,
-    gap: 8,
+    borderRadius: 12,
+    gap: 10,
   },
   taskCircle: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 1.5,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
     borderColor: GameColors.accent,
   },
   taskEmoji: {
-    fontSize: 15,
+    fontSize: 18,
   },
   taskTitle: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '500',
     color: GameColors.textDark,
+    letterSpacing: 0.1,
+  },
+  allDoneWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  allDoneText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: GameColors.primary,
+    textAlign: 'center',
+    letterSpacing: 0.2,
   },
 
   // ── Nav bar ──────────────────────────────────────────────────────────────────
@@ -402,14 +466,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingTop: 10,
-    paddingBottom: 10,
     borderTopWidth: 1,
     borderTopColor: GameColors.bgSection,
     backgroundColor: GameColors.white,
   },
   navItem: {
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
     paddingHorizontal: 10,
   },
   navLabel: {

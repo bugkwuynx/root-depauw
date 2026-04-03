@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -159,11 +160,11 @@ export default function CalendarViewScreen() {
           <View style={styles.headerRow}>
             <Pressable
               onPress={() => router.back()}
-              style={styles.backChip}
+              style={styles.backBtn}
               accessibilityRole="button"
               accessibilityLabel="Go back"
             >
-              <Text style={styles.backChipText}>Back</Text>
+              <Ionicons name="chevron-back" size={22} color="#2D5A3D" />
             </Pressable>
             <View style={{ width: 56 }} />
           </View>
@@ -290,19 +291,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  backChip: {
-    height: 36,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.55)',
-    borderWidth: 1,
-    borderColor: THEME.border,
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    backgroundColor: '#E1F0E3',
     justifyContent: 'center',
-  },
-  backChipText: {
-    color: THEME.textMuted,
-    fontWeight: '800',
-    letterSpacing: -0.2,
+    alignItems: 'center',
   },
   card: {
     borderRadius: 22,
