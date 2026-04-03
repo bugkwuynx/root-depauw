@@ -8,50 +8,197 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   fetchCalendarDayCompletion,
   type CalendarDayCompletionMap,
-} from '@/lib/calendarActivities';
-import { dateKeyLocal, startOfLocalDay } from '@/lib/dailyTaskCompletion';
-import { loadUserPreferences, type WeekStartPreference } from '@/lib/userPreferences';
+} from "@/lib/calendarActivities";
+import { dateKeyLocal, startOfLocalDay } from "@/lib/dailyTaskCompletion";
+import {
+  loadUserPreferences,
+  type WeekStartPreference,
+} from "@/lib/userPreferences";
 
-const THEME = {
-  bgPrimary: '#F3FAED',
-  bgSecondary: '#E1F0E3',
-  accentDark: '#5FAD89',
-  text: '#103C2F',
-  textMuted: '#2E6B57',
-  border: 'rgba(16, 60, 47, 0.14)',
-  card: 'rgba(255, 255, 255, 0.65)',
-  dayGreen: '#5FAD89',
-  dayGreenText: '#FFFFFF',
-  dayRed: '#C75C5C',
-  dayRedText: '#FFFFFF',
-  dayFuture: 'rgba(255, 255, 255, 0.55)',
-  dayFutureText: 'rgba(16, 60, 47, 0.35)',
-} as const;
+// ─── Mock Data ────────────────────────────────────────────────────────────────
 
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-] as const;
+/**
+ * Generates a realistic-looking completion map for a given month.
+ *
+ * Pattern (relative to today):
+ *  - Last 9 days (today included): active streak — mix of 'complete' and 'partial'
+ *  - A short break 10 days ago (streak was broken here → 'none')
+ *  - Earlier in the month: scattered partial/complete days with some gaps
+ *  - Days before the current month or in the future: omitted (undefined → 'none')
+ *
+ * Remove this function and the `MOCK_MODE` flag once your real
+ * `fetchCalendarDayCompletion` returns `DayCompletionState` values.
+ */
+const MOCK_MODE = true; // ← flip to false to use real data
 
-function weekdayLabels(weekStartsOn: WeekStartPreference): string[] {
-  if (weekStartsOn === 'sunday') return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+function buildMockCompletionMap(
+  year: number,
+  monthIndex: number,
+): RichCalendarDayCompletionMap {
+  const map: RichCalendarDayCompletionMap = {};
+  const today = startOfLocalDay(new Date());
+
+  // Helper: dateKey for an arbitrary Date
+  const key = (d: Date) => dateKeyLocal(d);
+
+  // Helper: shift today by N days
+  const daysAgo = (n: number) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - n);
+    return d;
+  };
+
+  // Only populate days that fall inside the requested month
+  const inMonth = (d: Date) =>
+    d.getFullYear() === year && d.getMonth() === monthIndex;
+
+  // ── Active streak: today back 8 days (9 days total) ──────────────────────
+  const streakPattern: DayCompletionState[] = [
+    "complete", // today        (day 0)
+    "complete", // yesterday    (day 1)
+    "partial", //              (day 2)
+    "complete", //              (day 3)
+    "complete", //              (day 4)
+    "partial", //              (day 5)
+    "complete", //              (day 6)
+    "complete", //              (day 7)
+    "partial", //              (day 8)
+  ];
+  streakPattern.forEach((state, i) => {
+    const d = daysAgo(i);
+    if (inMonth(d)) map[key(d)] = state;
+  });
+
+  // ── Gap day that broke the previous streak ────────────────────────────────
+  // day 9 is intentionally left out (resolves to 'none')
+
+  // ── Scattered activity earlier in the month ───────────────────────────────
+  const olderPattern: Array<[number, DayCompletionState]> = [
+    [10, "none"], // the break day — explicitly none
+    [11, "complete"],
+    [12, "partial"],
+    [13, "complete"],
+    [14, "none"],
+    [15, "partial"],
+    [16, "complete"],
+    [17, "none"],
+    [18, "complete"],
+    [19, "partial"],
+    [20, "none"],
+    [21, "complete"],
+    [22, "none"],
+    [23, "partial"],
+    [24, "complete"],
+    [25, "none"],
+    [26, "complete"],
+    [27, "partial"],
+    [28, "none"],
+    [29, "complete"],
+    [30, "partial"],
+  ];
+  olderPattern.forEach(([daysBack, state]) => {
+    const d = daysAgo(daysBack);
+    if (inMonth(d) && !map[key(d)]) map[key(d)] = state;
+  });
+
+  return map;
 }
 
-function leadingBlanks(year: number, monthIndex: number, weekStartsOn: WeekStartPreference): number {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+/**
+ * Each day can have one of three completion states:
+ *  - 'none'     → user had no activity (leave empty / neutral)
+ *  - 'partial'  → user completed at least one task but not all (light green)
+ *  - 'complete' → user completed every task for that day (dark green)
+ *
+ * Update `fetchCalendarDayCompletion` to return this richer map.
+ * The old boolean map (true = complete) is treated as 'complete' for
+ * backwards-compatibility via the helper `resolveState` below.
+ */
+export type DayCompletionState = "none" | "partial" | "complete";
+
+/**
+ * Extended map type. Your backend/lib can return either the legacy
+ * `boolean` shape or the new `DayCompletionState` shape — both are handled.
+ */
+export type RichCalendarDayCompletionMap = Record<
+  string,
+  DayCompletionState | boolean
+>;
+
+// ─── Theme ────────────────────────────────────────────────────────────────────
+
+const THEME = {
+  bgPrimary: "#F3FAED",
+  bgSecondary: "#E1F0E3",
+  accentDark: "#5FAD89",
+  text: "#103C2F",
+  textMuted: "#2E6B57",
+  border: "rgba(16, 60, 47, 0.14)",
+  card: "rgba(255, 255, 255, 0.65)",
+
+  // Empty past day — subtle neutral, not alarming
+  dayEmpty: "rgba(16, 60, 47, 0.06)",
+  dayEmptyText: "rgba(16, 60, 47, 0.35)",
+
+  // Partial completion — light green
+  dayPartial: "#A8D5B5",
+  dayPartialText: "#1A5C3A",
+
+  // Full completion — dark green
+  dayComplete: "#2E7D52",
+  dayCompleteText: "#FFFFFF",
+
+  // Future day — ghost / transparent
+  dayFuture: "rgba(255, 255, 255, 0.45)",
+  dayFutureText: "rgba(16, 60, 47, 0.28)",
+} as const;
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+const STREAK_BORDER = "#F5C842";
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Normalise legacy boolean values to the new DayCompletionState union. */
+function resolveState(
+  raw: DayCompletionState | boolean | undefined,
+): DayCompletionState {
+  if (raw === true) return "complete";
+  if (raw === false || raw === undefined) return "none";
+  return raw;
+}
+
+function weekdayLabels(weekStartsOn: WeekStartPreference): string[] {
+  if (weekStartsOn === "sunday")
+    return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+}
+
+function leadingBlanks(
+  year: number,
+  monthIndex: number,
+  weekStartsOn: WeekStartPreference,
+): number {
   const first = new Date(year, monthIndex, 1);
   const sun0 = first.getDay();
-  if (weekStartsOn === 'sunday') return sun0;
+  if (weekStartsOn === "sunday") return sun0;
   return (sun0 + 6) % 7;
 }
 
@@ -60,26 +207,88 @@ function daysInMonth(year: number, monthIndex: number): number {
 }
 
 type Cell =
-  | { kind: 'empty' }
-  | { kind: 'day'; date: Date; key: string; dayNum: number };
+  | { kind: "empty" }
+  | { kind: "day"; date: Date; key: string; dayNum: number };
 
-function buildMonthGrid(year: number, monthIndex: number, weekStartsOn: WeekStartPreference): Cell[] {
+function buildMonthGrid(
+  year: number,
+  monthIndex: number,
+  weekStartsOn: WeekStartPreference,
+): Cell[] {
   const lead = leadingBlanks(year, monthIndex, weekStartsOn);
   const dim = daysInMonth(year, monthIndex);
   const cells: Cell[] = [];
-  for (let i = 0; i < lead; i++) cells.push({ kind: 'empty' });
+  for (let i = 0; i < lead; i++) cells.push({ kind: "empty" });
   for (let d = 1; d <= dim; d++) {
     const date = new Date(year, monthIndex, d);
-    cells.push({ kind: 'day', date, key: dateKeyLocal(date), dayNum: d });
+    cells.push({ kind: "day", date, key: dateKeyLocal(date), dayNum: d });
   }
-  while (cells.length % 7 !== 0) cells.push({ kind: 'empty' });
-  while (cells.length < 42) cells.push({ kind: 'empty' });
+  while (cells.length % 7 !== 0) cells.push({ kind: "empty" });
+  while (cells.length < 42) cells.push({ kind: "empty" });
   return cells;
 }
 
-function dayCompleted(map: CalendarDayCompletionMap, dateKey: string): boolean {
-  return map[dateKey] === true;
+/**
+ * Compute the set of dateKeys that belong to the user's current active streak.
+ *
+ * A streak is an unbroken run of consecutive past/today days where the user
+ * had at least *partial* completion. The streak runs backwards from today (or
+ * the most-recent completed day if today hasn't been completed yet).
+ */
+function computeStreakKeys(
+  map: RichCalendarDayCompletionMap,
+  today: Date,
+): Set<string> {
+  const streakKeys = new Set<string>();
+
+  // Walk backwards day-by-day from today until we hit a 'none' day.
+  let cursor = new Date(today);
+  while (true) {
+    const key = dateKeyLocal(cursor);
+    const state = resolveState(map[key]);
+    if (state === "none" || state === undefined) break;
+    streakKeys.add(key);
+    cursor = new Date(
+      cursor.getFullYear(),
+      cursor.getMonth(),
+      cursor.getDate() - 1,
+    );
+  }
+
+  return streakKeys;
 }
+
+// ─── Visual helpers ───────────────────────────────────────────────────────────
+
+interface DayVisual {
+  bg: string;
+  fg: string;
+  isStreak: boolean;
+}
+
+function resolveDayVisual(
+  state: DayCompletionState,
+  isFuture: boolean,
+  streakKeys: Set<string>,
+  dateKey: string,
+): DayVisual {
+  if (isFuture) {
+    return { bg: THEME.dayFuture, fg: THEME.dayFutureText, isStreak: false };
+  }
+  const isStreak = streakKeys.has(dateKey);
+  switch (state) {
+    case "complete":
+      return { bg: THEME.dayComplete, fg: THEME.dayCompleteText, isStreak };
+    case "partial":
+      return { bg: THEME.dayPartial, fg: THEME.dayPartialText, isStreak };
+    case "none":
+    default:
+      // Past day with no activity — render empty/neutral (no colour fill)
+      return { bg: THEME.dayEmpty, fg: THEME.dayEmptyText, isStreak: false };
+  }
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CalendarViewScreen() {
   const router = useRouter();
@@ -87,10 +296,13 @@ export default function CalendarViewScreen() {
     const n = new Date();
     return { year: n.getFullYear(), monthIndex: n.getMonth() };
   });
-  const [weekStartsOn, setWeekStartsOn] = React.useState<WeekStartPreference>('monday');
-  const [completionMap, setCompletionMap] = React.useState<CalendarDayCompletionMap>({});
+  const [weekStartsOn, setWeekStartsOn] =
+    React.useState<WeekStartPreference>("monday");
+  const [completionMap, setCompletionMap] =
+    React.useState<RichCalendarDayCompletionMap>({});
   const [loading, setLoading] = React.useState(true);
 
+  // Load user preferences once
   React.useEffect(() => {
     let cancelled = false;
     void loadUserPreferences().then((prefs) => {
@@ -101,15 +313,24 @@ export default function CalendarViewScreen() {
     };
   }, []);
 
+  // Fetch completion data whenever the visible month changes
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        const map = await fetchCalendarDayCompletion({
-          year: cursor.year,
-          monthIndex: cursor.monthIndex,
-        });
+        let map: RichCalendarDayCompletionMap;
+        if (MOCK_MODE) {
+          // Simulate a brief network delay so the loading spinner is visible
+          await new Promise((r) => setTimeout(r, 350));
+          map = buildMockCompletionMap(cursor.year, cursor.monthIndex);
+        } else {
+          const raw = await fetchCalendarDayCompletion({
+            year: cursor.year,
+            monthIndex: cursor.monthIndex,
+          });
+          map = raw as RichCalendarDayCompletionMap;
+        }
         if (!cancelled) setCompletionMap(map);
       } finally {
         if (!cancelled) setLoading(false);
@@ -122,27 +343,32 @@ export default function CalendarViewScreen() {
 
   const cells = React.useMemo(
     () => buildMonthGrid(cursor.year, cursor.monthIndex, weekStartsOn),
-    [cursor.year, cursor.monthIndex, weekStartsOn]
+    [cursor.year, cursor.monthIndex, weekStartsOn],
+  );
+
+  const today = React.useMemo(() => startOfLocalDay(new Date()), []);
+
+  const streakKeys = React.useMemo(
+    () => computeStreakKeys(completionMap, today),
+    [completionMap, today],
   );
 
   const labels = weekdayLabels(weekStartsOn);
-
-  const goPrevMonth = () => {
-    setCursor((c) => {
-      if (c.monthIndex === 0) return { year: c.year - 1, monthIndex: 11 };
-      return { year: c.year, monthIndex: c.monthIndex - 1 };
-    });
-  };
-
-  const goNextMonth = () => {
-    setCursor((c) => {
-      if (c.monthIndex === 11) return { year: c.year + 1, monthIndex: 0 };
-      return { year: c.year, monthIndex: c.monthIndex + 1 };
-    });
-  };
-
   const monthTitle = `${MONTH_NAMES[cursor.monthIndex]} ${cursor.year}`;
-  const today = startOfLocalDay(new Date());
+
+  const goPrevMonth = () =>
+    setCursor((c) =>
+      c.monthIndex === 0
+        ? { year: c.year - 1, monthIndex: 11 }
+        : { year: c.year, monthIndex: c.monthIndex - 1 },
+    );
+
+  const goNextMonth = () =>
+    setCursor((c) =>
+      c.monthIndex === 11
+        ? { year: c.year + 1, monthIndex: 0 }
+        : { year: c.year, monthIndex: c.monthIndex + 1 },
+    );
 
   return (
     <LinearGradient
@@ -157,6 +383,7 @@ export default function CalendarViewScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* ── Header ── */}
           <View style={styles.headerRow}>
             <Pressable
               onPress={() => router.back()}
@@ -169,6 +396,16 @@ export default function CalendarViewScreen() {
             <View style={{ width: 56 }} />
           </View>
 
+          {/* ── Streak badge (only shown when there is an active streak) ── */}
+          {streakKeys.size > 1 && (
+            <View style={styles.streakBadge}>
+              <Text style={styles.streakBadgeText}>
+                🔥 {streakKeys.size}-day streak
+              </Text>
+            </View>
+          )}
+
+          {/* ── Calendar card ── */}
           <View style={styles.card}>
             {loading ? (
               <View style={styles.loading}>
@@ -177,16 +414,26 @@ export default function CalendarViewScreen() {
               </View>
             ) : (
               <>
+                {/* Month navigation */}
                 <View style={styles.monthNav}>
-                  <Pressable onPress={goPrevMonth} style={styles.navBtn} accessibilityLabel="Previous month">
+                  <Pressable
+                    onPress={goPrevMonth}
+                    style={styles.navBtn}
+                    accessibilityLabel="Previous month"
+                  >
                     <Text style={styles.navBtnText}>‹</Text>
                   </Pressable>
                   <Text style={styles.monthTitle}>{monthTitle}</Text>
-                  <Pressable onPress={goNextMonth} style={styles.navBtn} accessibilityLabel="Next month">
+                  <Pressable
+                    onPress={goNextMonth}
+                    style={styles.navBtn}
+                    accessibilityLabel="Next month"
+                  >
                     <Text style={styles.navBtnText}>›</Text>
                   </Pressable>
                 </View>
 
+                {/* Weekday labels */}
                 <View style={styles.weekRow}>
                   {labels.map((l) => (
                     <View key={l} style={styles.weekCell}>
@@ -195,74 +442,128 @@ export default function CalendarViewScreen() {
                   ))}
                 </View>
 
+                {/* Day grid */}
                 <View style={styles.grid}>
-                  {Array.from({ length: 6 }, (_, row) => (
-                    <View key={row} style={styles.gridRow}>
-                      {cells.slice(row * 7, row * 7 + 7).map((cell, idx) => {
-                        const key = cell.kind === 'day' ? cell.key : `e-${row}-${idx}`;
-                        if (cell.kind === 'empty') {
-                          return <View key={key} style={styles.dayCell} />;
-                        }
+                  {Array.from({ length: 6 }, (_, row) => {
+                    const rowCells = cells.slice(row * 7, row * 7 + 7);
 
-                        const dayStart = startOfLocalDay(cell.date);
-                        const isFuture = dayStart > today;
-                        const isToday = dayStart.getTime() === today.getTime();
-                        const completed = dayCompleted(completionMap, cell.key);
+                    // Find the first and last streak cell indices in this row
+                    // so we can draw a continuous border band across them.
+                    const streakIndices = rowCells
+                      .map((c, i) =>
+                        c.kind === "day" && streakKeys.has(c.key) ? i : -1,
+                      )
+                      .filter((i) => i !== -1);
+                    const rowHasStreak = streakIndices.length > 0;
 
-                        let bg: string = THEME.dayFuture;
-                        let fg: string = THEME.dayFutureText;
-                        if (!isFuture) {
-                          if (completed) {
-                            bg = THEME.dayGreen;
-                            fg = THEME.dayGreenText;
-                          } else {
-                            bg = THEME.dayRed;
-                            fg = THEME.dayRedText;
+                    return (
+                      <View key={row} style={styles.gridRow}>
+                        {rowCells.map((cell, idx) => {
+                          const key =
+                            cell.kind === "day" ? cell.key : `e-${row}-${idx}`;
+
+                          if (cell.kind === "empty") {
+                            return <View key={key} style={styles.dayCell} />;
                           }
-                        }
 
-                        const a11yState = isFuture
-                          ? 'upcoming day'
-                          : completed
-                            ? 'at least one task completed'
-                            : 'no tasks completed';
+                          const dayStart = startOfLocalDay(cell.date);
+                          const isFuture = dayStart > today;
+                          const isToday =
+                            dayStart.getTime() === today.getTime();
+                          const state = resolveState(completionMap[cell.key]);
+                          const { bg, fg, isStreak } = resolveDayVisual(
+                            state,
+                            isFuture,
+                            streakKeys,
+                            cell.key,
+                          );
 
-                        return (
-                          <View
-                            key={key}
-                            style={styles.dayCell}
-                            accessible
-                            accessibilityRole="text"
-                            accessibilityLabel={`${MONTH_NAMES[cursor.monthIndex]} ${cell.dayNum}, ${a11yState}`}
-                          >
+                          const streakBandStyle = isStreak
+                            ? {
+                                borderWidth: 4,
+                                borderColor: STREAK_BORDER,
+                                borderRadius: 12,
+                              }
+                            : undefined;
+
+                          const a11yLabel = isFuture
+                            ? `${MONTH_NAMES[cursor.monthIndex]} ${cell.dayNum}, upcoming`
+                            : state === "complete"
+                              ? `${MONTH_NAMES[cursor.monthIndex]} ${cell.dayNum}, all tasks completed${isStreak ? ", on streak" : ""}`
+                              : state === "partial"
+                                ? `${MONTH_NAMES[cursor.monthIndex]} ${cell.dayNum}, partially completed${isStreak ? ", on streak" : ""}`
+                                : `${MONTH_NAMES[cursor.monthIndex]} ${cell.dayNum}, no tasks completed`;
+
+                          return (
                             <View
-                              style={[
-                                styles.dayInner,
-                                { backgroundColor: bg },
-                                isToday && styles.dayInnerToday,
-                              ]}
+                              key={key}
+                              style={styles.dayCell}
+                              accessible
+                              accessibilityRole="text"
+                              accessibilityLabel={a11yLabel}
                             >
-                              <Text style={[styles.dayNum, { color: fg }]}>{cell.dayNum}</Text>
+                              <View
+                                style={[
+                                  styles.dayInner,
+                                  { backgroundColor: bg },
+                                  isToday && styles.dayInnerToday,
+                                  streakBandStyle,
+                                ]}
+                              >
+                                <Text style={[styles.dayNum, { color: fg }]}>
+                                  {cell.dayNum}
+                                </Text>
+                              </View>
                             </View>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  ))}
+                          );
+                        })}
+                      </View>
+                    );
+                  })}
                 </View>
 
+                {/* Legend */}
                 <View style={styles.legend}>
                   <View style={styles.legendItem}>
-                    <View style={[styles.legendSwatch, { backgroundColor: THEME.dayGreen }]} />
-                    <Text style={styles.legendText}>Completed a task</Text>
+                    <View
+                      style={[
+                        styles.legendSwatch,
+                        { backgroundColor: THEME.dayComplete },
+                      ]}
+                    />
+                    <Text style={styles.legendText}>All tasks done</Text>
                   </View>
                   <View style={styles.legendItem}>
-                    <View style={[styles.legendSwatch, { backgroundColor: THEME.dayRed }]} />
-                    <Text style={styles.legendText}>No tasks completed</Text>
+                    <View
+                      style={[
+                        styles.legendSwatch,
+                        { backgroundColor: THEME.dayPartial },
+                      ]}
+                    />
+                    <Text style={styles.legendText}>Partially done</Text>
                   </View>
                   <View style={styles.legendItem}>
-                    <View style={[styles.legendSwatch, { backgroundColor: THEME.dayFuture }]} />
-                    <Text style={styles.legendText}>Upcoming</Text>
+                    <View
+                      style={[
+                        styles.legendSwatch,
+                        {
+                          backgroundColor: THEME.dayEmpty,
+                          borderWidth: 1,
+                          borderColor: THEME.border,
+                        },
+                      ]}
+                    />
+                    <Text style={styles.legendText}>No activity</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View
+                      style={[
+                        styles.legendSwatch,
+                        styles.legendSwatchStreak,
+                        { backgroundColor: THEME.dayComplete },
+                      ]}
+                    />
+                    <Text style={styles.legendText}>Streak day 🔥</Text>
                   </View>
                 </View>
               </>
@@ -274,6 +575,8 @@ export default function CalendarViewScreen() {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   gradient: { flex: 1 },
   safe: { flex: 1 },
@@ -282,13 +585,13 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 32,
     maxWidth: 520,
-    width: '100%',
-    alignSelf: 'center',
+    width: "100%",
+    alignSelf: "center",
   },
   headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
   backBtn: {
@@ -298,6 +601,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#E1F0E3',
     justifyContent: 'center',
     alignItems: 'center',
+  backChip: {
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: "rgba(255, 255, 255, 0.55)",
+    borderWidth: 1,
+    borderColor: THEME.border,
+    justifyContent: "center",
+  },
+  backChipText: {
+    color: THEME.textMuted,
+    fontWeight: "800",
+    letterSpacing: -0.2,
+  },
+  streakBadge: {
+    alignSelf: "flex-start",
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(46, 125, 82, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(46, 125, 82, 0.25)",
+  },
+  streakBadgeText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: THEME.dayComplete,
+    letterSpacing: -0.2,
   },
   card: {
     borderRadius: 22,
@@ -306,21 +638,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: THEME.border,
   },
-  loading: { paddingVertical: 48, alignItems: 'center', gap: 12 },
+  loading: { paddingVertical: 48, alignItems: "center", gap: 12 },
   loadingHint: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: THEME.textMuted,
   },
   monthNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 14,
   },
   monthTitle: {
     fontSize: 17,
-    fontWeight: '900',
+    fontWeight: "900",
     color: THEME.text,
     letterSpacing: -0.3,
   },
@@ -328,39 +660,35 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    backgroundColor: "rgba(255, 255, 255, 0.75)",
     borderWidth: 1,
     borderColor: THEME.border,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   navBtnText: {
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: "900",
     color: THEME.accentDark,
     marginTop: -2,
   },
   weekRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: 8,
   },
   weekCell: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
   },
   weekLabel: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: "800",
     color: THEME.textMuted,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 0.4,
   },
-  grid: {
-    gap: 0,
-  },
-  gridRow: {
-    flexDirection: 'row',
-  },
+  grid: { gap: 0 },
+  gridRow: { flexDirection: "row" },
   dayCell: {
     flex: 1,
     aspectRatio: 1,
@@ -369,8 +697,8 @@ const styles = StyleSheet.create({
   dayInner: {
     flex: 1,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     minHeight: 36,
   },
   dayInnerToday: {
@@ -379,30 +707,32 @@ const styles = StyleSheet.create({
   },
   dayNum: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: "600",
   },
   legend: {
     marginTop: 18,
     gap: 10,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(16, 60, 47, 0.1)',
+    borderTopColor: "rgba(16, 60, 47, 0.1)",
   },
   legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
   },
   legendSwatch: {
     width: 18,
     height: 18,
     borderRadius: 6,
-    borderWidth: 1,
-    borderColor: THEME.border,
+  },
+  legendSwatchStreak: {
+    borderWidth: 2,
+    borderColor: "#2E7D52",
   },
   legendText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: THEME.textMuted,
   },
 });
