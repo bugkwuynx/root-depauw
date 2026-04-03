@@ -8,9 +8,10 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -230,11 +231,11 @@ export default function TasksScreen() {
             </View>
           )}
           <Pressable
-            onPress={() => router.push('/trees')}
-            style={styles.treesBtn}
+            onPress={() => router.back()}
+            style={styles.backBtn}
             hitSlop={8}
           >
-            <Text style={styles.treesBtnText}>🌳</Text>
+            <Ionicons name="chevron-back" size={22} color="#2D5A3D" />
           </Pressable>
         </View>
 
@@ -551,8 +552,7 @@ const styles = StyleSheet.create({
   },
   allDoneText: { fontSize: 14, fontWeight: '700', color: '#5FAD89' },
 
-  // Trees nav button in header
-  treesBtn: {
+  backBtn: {
     width: 40,
     height: 40,
     borderRadius: 13,
@@ -560,5 +560,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  treesBtnText: { fontSize: 20 },
 });

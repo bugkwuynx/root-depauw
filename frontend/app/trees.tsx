@@ -5,9 +5,9 @@ import {
   ScrollView,
   StyleSheet,
   Pressable,
-  SafeAreaView,
   Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 const { width: SCREEN_W } = Dimensions.get('window');
