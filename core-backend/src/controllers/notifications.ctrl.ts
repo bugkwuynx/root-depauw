@@ -19,9 +19,9 @@ export const saveToken = async (req: SaveTokenRequest, res: Response) => {
         return res.json({success: true, message: "Token already exists"});
     }
 
-    await db.collection("tokens").add({ token });
+    await db.collection("tokens").doc(`${token}`).set({ token });
 
-    console.log(`Token saved. Total devices: ${await db.collection("tokens").get().then(snap => snap.size)}`);
+    // console.log(`Token saved. Total devices: ${await db.collection("tokens").get().then(snap => snap.size)}`);
     
     res.json({success: true, message: "Token saved successfully"});
 }
