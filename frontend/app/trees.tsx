@@ -5,10 +5,11 @@ import {
   ScrollView,
   StyleSheet,
   Pressable,
-  SafeAreaView,
   Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const COLS = 4;
@@ -158,7 +159,7 @@ export default function TreesScreen() {
       {/* ── Header ── */}
       <View style={s.header}>
         <Pressable hitSlop={12} onPress={() => router.back()} style={s.backBtn}>
-          <Text style={s.backArrow}>←</Text>
+          <Ionicons name="chevron-back" size={22} color="#2D5A3D" />
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={s.headerTitle}>My Trees</Text>
@@ -231,7 +232,6 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backArrow: { fontSize: 20, color: '#2D5A3D', fontWeight: '700' },
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#2D5A3D', letterSpacing: -0.3 },
   headerSub: { fontSize: 12, color: '#83BF99', marginTop: 1, fontWeight: '500' },
   badge: {
