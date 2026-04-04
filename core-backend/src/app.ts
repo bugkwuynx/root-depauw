@@ -8,6 +8,8 @@ import notificationsRouter from './routes/notifications.route.js';
 
 dotenv.config();
 
+import recommendationsRouter from "./routes/recommendations.route.js";
+
 const app = express();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
@@ -16,6 +18,7 @@ app.use(express.json());
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/game', gameRoutes);
 app.use('/api/tasks', tasksRoutes);
+app.use('/api/recommendations', recommendationsRouter);
 
 app.get('/', (_req, res) => {
     res.send('root@depauw backend');
