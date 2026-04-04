@@ -1,17 +1,19 @@
 // src/app.ts
-
 import express from 'express';
+import cors from 'cors';
 import dotenv from 'dotenv';
 import gameRoutes from './routes/game.routes.js';
 import tasksRoutes from './routes/tasks.routes.js';
+import notificationsRouter from './routes/notifications.route.js';
 
 dotenv.config();
 
 const app = express();
-const port = 5000;
+const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
+app.use(cors());
 app.use(express.json());
-
+app.use('/api/notifications', notificationsRouter);
 app.use('/api/game', gameRoutes);
 app.use('/api/tasks', tasksRoutes);
 
