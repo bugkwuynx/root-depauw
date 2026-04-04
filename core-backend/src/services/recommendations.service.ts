@@ -10,6 +10,11 @@ export async function getRecommendations(
 
     const { campusEvents, calendarEventsTime, userGoals } = getRecommendationsInput;
 
+    if (!campusEvents || !calendarEventsTime || !userGoals) {
+        console.error("Missing required input fields");
+        return null;
+    }
+
     const prompt = `
         You are a student scheduling assistant at DePauw University.
 
@@ -64,4 +69,37 @@ export async function getRecommendations(
     return recommendationsCollection;
 }
 
-//getRecommendations(exampleInput);
+/**
+ * Sample input:
+ * 
+{  
+    "campusEvents": [
+        {
+        "id": "evt001",
+        "organizationName": "DePauw Career Center",
+        "eventTitle": "Resume Workshop",
+        "eventDescription": "Learn how to craft a compelling resume for internship applications.",
+        "location": [{ "name": "Hoover Hall 101" }],
+        "startTime": "2026-04-04T14:00:00",
+        "endTime": "2026-04-04T15:00:00",
+        "tags": ["career", "professional development"]
+        },
+        {
+        "id": "evt002",
+        "organizationName": "DePauw Wellness",
+        "eventTitle": "Mindfulness Meditation Session",
+        "eventDescription": "A guided 30-minute meditation session to reduce stress.",
+        "location": [{ "name": "Lilly Center Room 5" }],
+        "startTime": "2026-04-04T17:00:00",
+        "endTime": "2026-04-04T17:30:00",
+        "tags": ["wellness", "mental health"]
+        }
+    ],
+    "calendarEventsTime": [
+        { "startTime": "2026-04-04T08:00:00", "endTime": "2026-04-04T09:15:00" },
+        { "startTime": "2026-04-04T10:30:00", "endTime": "2026-04-04T11:45:00" },
+        { "startTime": "2026-04-04T13:00:00", "endTime": "2026-04-04T13:50:00" }
+    ],
+    "userGoals": ["career growth", "mental wellness", "academic success"]
+}
+ */

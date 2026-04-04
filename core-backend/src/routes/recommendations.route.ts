@@ -1,4 +1,4 @@
-import { getRecommendationsController } from "../controllers/recommendations.ctrl.js";
+import { getRecommendationsController } from "../controllers/recommendations.controller.js";
 import { Router } from "express";
 
 const recommendationsRouter = Router();
