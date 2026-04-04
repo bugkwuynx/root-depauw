@@ -6,6 +6,8 @@ import {
     useFertilizer,
     declineFertilizer,
     getWarningStatus,
+    updateTreeId,
+    fetchCompletedTrees,
 } from '../services/game.service.js';
 import { NotFoundError, ConflictError, ValidationError } from '../utils/errors.js';
 
@@ -55,6 +57,34 @@ export async function useFertilizerHandler(req: Request, res: Response): Promise
         if (err instanceof NotFoundError) { res.status(404).json({ error: err.message }); return; }
         if (err instanceof ConflictError) { res.status(409).json({ error: err.message }); return; }
         if (err instanceof ValidationError) { res.status(400).json({ error: err.message }); return; }
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+export async function updateTreeIdHandler(req: Request, res: Response): Promise<void> {
+    const { userId } = req.params as { userId: string };
+    const { treeId } = req.body as { treeId?: unknown };
+    const newTreeId = Number(treeId);
+    if (isNaN(newTreeId) || newTreeId <= 0) {
+        res.status(400).json({ error: 'treeId must be a positive number' });
+        return;
+    }
+    try {
+        const state = await updateTreeId(userId, newTreeId);
+        res.json(state);
+    } catch (err) {
+        if (err instanceof NotFoundError) { res.status(404).json({ error: err.message }); return; }
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+export async function getCompletedTreesHandler(req: Request, res: Response): Promise<void> {
+    const { userId } = req.params as { userId: string };
+    try {
+        const trees = await fetchCompletedTrees(userId);
+        res.json(trees);
+    } catch (err) {
+        if (err instanceof NotFoundError) { res.status(404).json({ error: err.message }); return; }
         res.status(500).json({ error: 'Internal server error' });
     }
 }
