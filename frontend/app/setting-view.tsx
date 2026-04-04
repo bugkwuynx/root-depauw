@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -28,6 +29,7 @@ import {
   loadUserPreferences,
   newCustomGoalId,
   saveUserPreferences,
+  USER_ID_STORAGE_KEY,
   type UserGoal,
   type UserPreferences,
 } from "@/lib/userPreferences";
@@ -79,6 +81,7 @@ function presetIdsOnProfile(goals: UserGoal[]): Set<string> {
 
 export default function SettingViewScreen() {
   const router = useRouter();
+  const userIdRef = React.useRef<string | null>(null);
   const [prefs, setPrefs] = React.useState<UserPreferences>(
     DEFAULT_USER_PREFERENCES,
   );
@@ -95,7 +98,9 @@ export default function SettingViewScreen() {
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const next = await loadUserPreferences();
+      const userId = "1";
+      userIdRef.current = userId;
+      const next = await loadUserPreferences(userId ?? "1");
       setPrefs(next);
     } finally {
       setLoading(false);
@@ -116,7 +121,7 @@ export default function SettingViewScreen() {
     async (next: UserPreferences, fieldKey: string) => {
       setSavingField(fieldKey);
       try {
-        await saveUserPreferences(next);
+        await saveUserPreferences(userIdRef.current ?? "", next);
         setPrefs(next);
       } catch {
         Alert.alert("Could not save", "Please try again.");
@@ -394,7 +399,6 @@ export default function SettingViewScreen() {
                       ios_backgroundColor="rgba(16,60,47,0.2)"
                     />
                   </View>
-
                 </View>
 
                 <Pressable

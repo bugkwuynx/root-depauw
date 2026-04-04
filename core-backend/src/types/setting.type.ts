@@ -22,3 +22,12 @@ export interface UpdateUserSettingRequest extends Request {
         newSetting: Setting;
     };
 }
+
+export interface PatchUserSettingRequest extends Request {
+    params: {
+        userId: string;
+    };
+    body: {
+        newSetting: Partial<Setting>;
+    };
+}
