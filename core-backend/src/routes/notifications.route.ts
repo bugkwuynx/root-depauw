@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getDevices, saveToken, sendToAll, sendToDevice } from "../controllers/notifications.ctrl.js";
+import { getDevices, saveToken, sendToAll, sendToDevice } from "../controllers/notifications.controller.js";
 
 const notificationsRouter = Router();
 
