@@ -1,9 +1,16 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
   fetchCalendarDayCompletion,
@@ -598,9 +605,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 13,
-    backgroundColor: '#E1F0E3',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#E1F0E3",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   backChip: {
     height: 36,
     paddingHorizontal: 14,

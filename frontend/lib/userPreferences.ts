@@ -1,8 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Setting } from '@/types/setting.type';
 
 const STORAGE_KEY = '@depauw_user_preferences_v1';
-
-export type WeekStartPreference = 'monday' | 'sunday';
 
 export type UserGoal =
   | { kind: 'preset'; presetId: string }
@@ -13,7 +12,6 @@ export type UserPreferences = {
   preferEmptyGoalsList: boolean;
   displayName: string;
   remindersEnabled: boolean;
-  weekStartsOn: WeekStartPreference;
 };
 
 export const DEFAULT_USER_PREFERENCES: UserPreferences = {
@@ -21,7 +19,6 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   preferEmptyGoalsList: false,
   displayName: '',
   remindersEnabled: true,
-  weekStartsOn: 'monday',
 };
 
 function mergeWithDefaults(raw: unknown): UserPreferences {
@@ -43,9 +40,6 @@ function mergeWithDefaults(raw: unknown): UserPreferences {
     })
     .filter((g): g is UserGoal => g != null && (g.kind !== 'custom' || g.label.length > 0));
 
-  const weekStartsOn =
-    o.weekStartsOn === 'sunday' || o.weekStartsOn === 'monday' ? o.weekStartsOn : 'monday';
-
   return {
     goals: normalizedGoals,
     preferEmptyGoalsList:
@@ -53,7 +47,6 @@ function mergeWithDefaults(raw: unknown): UserPreferences {
     displayName: typeof o.displayName === 'string' ? o.displayName : '',
     remindersEnabled:
       typeof o.remindersEnabled === 'boolean' ? o.remindersEnabled : DEFAULT_USER_PREFERENCES.remindersEnabled,
-    weekStartsOn,
   };
 }
 
@@ -62,17 +55,26 @@ function mergeWithDefaults(raw: unknown): UserPreferences {
  * Return `null` to skip the network and use only AsyncStorage.
  * Throw on unrecoverable auth/network errors if you want `loadUserPreferences` to fall back to local cache.
  */
-export async function fetchUserPreferencesFromBackend(): Promise<unknown | null> {
-  // Example:
-  // const res = await fetch(`${API_URL}/user/preferences`, { headers: authHeaders });
-  // if (!res.ok) throw new Error('Failed to load preferences');
-  // return res.json();
-  return null;
+export async function fetchUserPreferencesFromBackend(userId: string): Promise<Setting | null> {
+  try {
+    const getSettingResponse = await fetch(`/api/setting/${userId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!getSettingResponse.ok) {
+      throw new Error('Failed to fetch user preferences from backend');
+    }
+
+    return await getSettingResponse.json();
+  } catch (error) {
+    throw new Error(`Failed to fetch user preferences from backend: ${(error as Error).message}`);
+  }
 }
 
 export type UserProfileSyncPayload = Pick<
   UserPreferences,
-  'displayName' | 'remindersEnabled' | 'weekStartsOn' | 'preferEmptyGoalsList'
+  'displayName' | 'remindersEnabled' | 'preferEmptyGoalsList'
 >;
 
 /**
@@ -111,10 +113,10 @@ export async function syncUserProfileToBackend(_profile: UserProfileSyncPayload)
  * If you have a single resource, replace this implementation with one `PUT` of `next` (and no-op the split helpers).
  */
 export async function syncUserPreferencesToBackend(next: UserPreferences): Promise<void> {
-  const { goals, displayName, remindersEnabled, weekStartsOn, preferEmptyGoalsList } = next;
+  const { goals, displayName, remindersEnabled, preferEmptyGoalsList } = next;
   await Promise.all([
     syncUserGoalsToBackend(goals),
-    syncUserProfileToBackend({ displayName, remindersEnabled, weekStartsOn, preferEmptyGoalsList }),
+    syncUserProfileToBackend({ displayName, remindersEnabled, preferEmptyGoalsList }),
   ]);
   // Alternative — one combined upsert:
   // const res = await fetch(`${API_URL}/user/preferences`, {
