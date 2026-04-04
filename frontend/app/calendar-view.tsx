@@ -15,101 +15,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import {
   fetchCalendarDayCompletion,
   type CalendarDayCompletionMap,
+  type CalendarDayCompletionState,
 } from "@/lib/calendarActivities";
 import { dateKeyLocal, startOfLocalDay } from "@/lib/dailyTaskCompletion";
-import {
-  loadUserPreferences,
-  type WeekStartPreference,
-} from "@/lib/userPreferences";
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-/**
- * Generates a realistic-looking completion map for a given month.
- *
- * Pattern (relative to today):
- *  - Last 9 days (today included): active streak — mix of 'complete' and 'partial'
- *  - A short break 10 days ago (streak was broken here → 'none')
- *  - Earlier in the month: scattered partial/complete days with some gaps
- *  - Days before the current month or in the future: omitted (undefined → 'none')
- *
- * Remove this function and the `MOCK_MODE` flag once your real
- * `fetchCalendarDayCompletion` returns `DayCompletionState` values.
- */
-const MOCK_MODE = true; // ← flip to false to use real data
-
-function buildMockCompletionMap(
-  year: number,
-  monthIndex: number,
-): RichCalendarDayCompletionMap {
-  const map: RichCalendarDayCompletionMap = {};
-  const today = startOfLocalDay(new Date());
-
-  // Helper: dateKey for an arbitrary Date
-  const key = (d: Date) => dateKeyLocal(d);
-
-  // Helper: shift today by N days
-  const daysAgo = (n: number) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() - n);
-    return d;
-  };
-
-  // Only populate days that fall inside the requested month
-  const inMonth = (d: Date) =>
-    d.getFullYear() === year && d.getMonth() === monthIndex;
-
-  // ── Active streak: today back 8 days (9 days total) ──────────────────────
-  const streakPattern: DayCompletionState[] = [
-    "complete", // today        (day 0)
-    "complete", // yesterday    (day 1)
-    "partial", //              (day 2)
-    "complete", //              (day 3)
-    "complete", //              (day 4)
-    "partial", //              (day 5)
-    "complete", //              (day 6)
-    "complete", //              (day 7)
-    "partial", //              (day 8)
-  ];
-  streakPattern.forEach((state, i) => {
-    const d = daysAgo(i);
-    if (inMonth(d)) map[key(d)] = state;
-  });
-
-  // ── Gap day that broke the previous streak ────────────────────────────────
-  // day 9 is intentionally left out (resolves to 'none')
-
-  // ── Scattered activity earlier in the month ───────────────────────────────
-  const olderPattern: Array<[number, DayCompletionState]> = [
-    [10, "none"], // the break day — explicitly none
-    [11, "complete"],
-    [12, "partial"],
-    [13, "complete"],
-    [14, "none"],
-    [15, "partial"],
-    [16, "complete"],
-    [17, "none"],
-    [18, "complete"],
-    [19, "partial"],
-    [20, "none"],
-    [21, "complete"],
-    [22, "none"],
-    [23, "partial"],
-    [24, "complete"],
-    [25, "none"],
-    [26, "complete"],
-    [27, "partial"],
-    [28, "none"],
-    [29, "complete"],
-    [30, "partial"],
-  ];
-  olderPattern.forEach(([daysBack, state]) => {
-    const d = daysAgo(daysBack);
-    if (inMonth(d) && !map[key(d)]) map[key(d)] = state;
-  });
-
-  return map;
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -192,20 +100,12 @@ function resolveState(
   return raw;
 }
 
-function weekdayLabels(weekStartsOn: WeekStartPreference): string[] {
-  if (weekStartsOn === "sunday")
-    return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function weekdayLabels(): string[] {
   return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 }
 
-function leadingBlanks(
-  year: number,
-  monthIndex: number,
-  weekStartsOn: WeekStartPreference,
-): number {
-  const first = new Date(year, monthIndex, 1);
-  const sun0 = first.getDay();
-  if (weekStartsOn === "sunday") return sun0;
+function leadingBlanks(year: number, monthIndex: number): number {
+  const sun0 = new Date(year, monthIndex, 1).getDay();
   return (sun0 + 6) % 7;
 }
 
@@ -217,12 +117,8 @@ type Cell =
   | { kind: "empty" }
   | { kind: "day"; date: Date; key: string; dayNum: number };
 
-function buildMonthGrid(
-  year: number,
-  monthIndex: number,
-  weekStartsOn: WeekStartPreference,
-): Cell[] {
-  const lead = leadingBlanks(year, monthIndex, weekStartsOn);
+function buildMonthGrid(year: number, monthIndex: number): Cell[] {
+  const lead = leadingBlanks(year, monthIndex);
   const dim = daysInMonth(year, monthIndex);
   const cells: Cell[] = [];
   for (let i = 0; i < lead; i++) cells.push({ kind: "empty" });
@@ -303,41 +199,23 @@ export default function CalendarViewScreen() {
     const n = new Date();
     return { year: n.getFullYear(), monthIndex: n.getMonth() };
   });
-  const [weekStartsOn, setWeekStartsOn] =
-    React.useState<WeekStartPreference>("monday");
   const [completionMap, setCompletionMap] =
     React.useState<RichCalendarDayCompletionMap>({});
   const [loading, setLoading] = React.useState(true);
+  const userId = "1";
 
-  // Load user preferences once
+  // Fetch completion data whenever the visible month or userId changes
   React.useEffect(() => {
-    let cancelled = false;
-    void loadUserPreferences().then((prefs) => {
-      if (!cancelled) setWeekStartsOn(prefs.weekStartsOn);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Fetch completion data whenever the visible month changes
-  React.useEffect(() => {
+    if (!userId) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        let map: RichCalendarDayCompletionMap;
-        if (MOCK_MODE) {
-          // Simulate a brief network delay so the loading spinner is visible
-          await new Promise((r) => setTimeout(r, 350));
-          map = buildMockCompletionMap(cursor.year, cursor.monthIndex);
-        } else {
-          const raw = await fetchCalendarDayCompletion({
-            year: cursor.year,
-            monthIndex: cursor.monthIndex,
-          });
-          map = raw as RichCalendarDayCompletionMap;
-        }
+        const map = await fetchCalendarDayCompletion({
+          year: cursor.year,
+          monthIndex: cursor.monthIndex,
+          userId,
+        });
         if (!cancelled) setCompletionMap(map);
       } finally {
         if (!cancelled) setLoading(false);
@@ -346,11 +224,11 @@ export default function CalendarViewScreen() {
     return () => {
       cancelled = true;
     };
-  }, [cursor.year, cursor.monthIndex]);
+  }, [cursor.year, cursor.monthIndex, userId]);
 
   const cells = React.useMemo(
-    () => buildMonthGrid(cursor.year, cursor.monthIndex, weekStartsOn),
-    [cursor.year, cursor.monthIndex, weekStartsOn],
+    () => buildMonthGrid(cursor.year, cursor.monthIndex),
+    [cursor.year, cursor.monthIndex],
   );
 
   const today = React.useMemo(() => startOfLocalDay(new Date()), []);
@@ -360,7 +238,7 @@ export default function CalendarViewScreen() {
     [completionMap, today],
   );
 
-  const labels = weekdayLabels(weekStartsOn);
+  const labels = weekdayLabels();
   const monthTitle = `${MONTH_NAMES[cursor.monthIndex]} ${cursor.year}`;
 
   const goPrevMonth = () =>
@@ -736,7 +614,7 @@ const styles = StyleSheet.create({
   },
   legendSwatchStreak: {
     borderWidth: 2,
-    borderColor: "#2E7D52",
+    borderColor: STREAK_BORDER,
   },
   legendText: {
     fontSize: 14,
