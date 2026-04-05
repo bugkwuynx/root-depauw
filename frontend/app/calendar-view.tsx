@@ -598,9 +598,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 13,
-    backgroundColor: '#E1F0E3',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#E1F0E3",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   backChip: {
     height: 36,
     paddingHorizontal: 14,
