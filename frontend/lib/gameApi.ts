@@ -1,4 +1,4 @@
-import type { GameState, UserStreak, Tree, WarningStatus } from '@/types/game.type';
+import type { GameState, UserStreak, Tree, WarningStatus, Task, DailyTask, FinalizeResult, UserProfile } from '@/types/game.type';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:3000';
 
@@ -31,3 +31,32 @@ export const useFertilizer = (userId: string) =>
 
 export const declineFertilizer = (userId: string) =>
   request<GameState>(`/api/game/${userId}/fertilizer/decline`, { method: 'POST' });
+
+export const getUserProfile = (userId: string) =>
+  request<UserProfile>(`/api/game/${userId}/profile`);
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+export const todayDate = (): string => new Date().toISOString().split('T')[0]!;
+
+// ── Tasks ─────────────────────────────────────────────────────────────────────
+
+export const getDailyTasks = (userId: string, date: string) =>
+  request<DailyTask>(`/api/tasks/${userId}/${date}`);
+
+export const confirmTasks = (userId: string, date: string, tasks: Task[]) =>
+  request<DailyTask>(`/api/tasks/${userId}/${date}/confirm-setup`, {
+    method: 'POST',
+    body: JSON.stringify({ tasks }),
+  });
+
+export const completeTask = (userId: string, date: string, taskId: string) =>
+  request<Task>(`/api/tasks/${userId}/${date}/complete`, {
+    method: 'PATCH',
+    body: JSON.stringify({ taskId }),
+  });
+
+export const finalizeDailyTasks = (userId: string, date: string) =>
+  request<FinalizeResult>(`/api/tasks/${userId}/${date}/finalize`, {
+    method: 'POST',
+  });

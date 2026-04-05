@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,11 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
@@ -20,6 +22,50 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SetupTaskItem, TrackingTaskItem } from '@/components/TaskItem';
 import { mockDailyTasks, mockSuggestedEvents, mockCustomTasks } from '@/data/mockTasks';
+import * as gameApi from '@/lib/gameApi';
+import type { Task } from '@/types/game.type';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+// TODO: replace with userId from auth context once teammate's PR is merged
+const USER_ID = 'testUser123';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Emoji assignment based on task title keywords
+// ─────────────────────────────────────────────────────────────────────────────
+
+const EMOJI_MAP: { keywords: string[]; emoji: string }[] = [
+  { keywords: ['walk', 'run', 'jog', 'exercise', 'gym', 'workout', 'sport', 'hike', 'bike', 'swim'], emoji: '🏃' },
+  { keywords: ['study', 'read', 'homework', 'assignment', 'lecture', 'exam', 'quiz', 'academic', 'library', 'research'], emoji: '📚' },
+  { keywords: ['meditat', 'mindful', 'yoga', 'breath', 'calm', 'stress', 'relax'], emoji: '🧘' },
+  { keywords: ['water', 'drink', 'hydrat'], emoji: '💧' },
+  { keywords: ['sleep', 'rest', 'nap'], emoji: '😴' },
+  { keywords: ['eat', 'meal', 'food', 'breakfast', 'lunch', 'dinner', 'cook', 'snack', 'nutrition'], emoji: '🥗' },
+  { keywords: ['friend', 'social', 'hang', 'connect', 'people', 'club'], emoji: '🤝' },
+  { keywords: ['write', 'journal', 'reflect', 'diary', 'note'], emoji: '📝' },
+  { keywords: ['music', 'sing', 'instrument', 'art', 'draw', 'paint', 'creat'], emoji: '🎨' },
+  { keywords: ['volunteer', 'service', 'communit', 'help', 'support'], emoji: '🌍' },
+  { keywords: ['career', 'resume', 'intern', 'job', 'network', 'profess', 'workshop'], emoji: '💼' },
+  { keywords: ['stretch', 'warm', 'fit', 'active', 'move', 'dance'], emoji: '🤸' },
+  { keywords: ['call', 'text', 'phone', 'reach out', 'check in', 'message'], emoji: '📱' },
+  { keywords: ['meet', 'attend', 'join', 'visit', 'campus', 'session', 'event'], emoji: '📅' },
+  { keywords: ['clean', 'tidy', 'organize', 'laundry', 'room'], emoji: '🧹' },
+  { keywords: ['gratitude', 'grateful', 'thank', 'positive'], emoji: '🌸' },
+  { keywords: ['outdoor', 'nature', 'park', 'garden', 'fresh air', 'outside'], emoji: '🌳' },
+  { keywords: ['mental', 'health', 'wellness', 'wellbeing', 'self'], emoji: '💚' },
+  { keywords: ['coffee', 'tea', 'cafe', 'breakfast'], emoji: '☕' },
+];
+
+function assignEmoji(title: string, type: 'event' | 'task'): string {
+  if (type === 'event') return '📅';
+  const lower = title.toLowerCase();
+  for (const { keywords, emoji } of EMOJI_MAP) {
+    if (keywords.some((k) => lower.includes(k))) return emoji;
+  }
+  return '✨';
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -36,10 +82,10 @@ type AppTask = {
   coinBonus?: number;
 };
 
-type Phase = 'setup' | 'tracking';
+type Phase = 'loading' | 'setup' | 'tracking';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Seed data from mocks
+// Seed data from mocks (used for setup phase until recommendations are wired)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const seedDailyTasks: AppTask[] = mockDailyTasks.map((t) => ({
@@ -109,7 +155,8 @@ function EmptyState({ message }: { message: string }) {
 
 export default function TasksScreen() {
   const router = useRouter();
-  const [phase, setPhase] = useState<Phase>('setup');
+  const [phase, setPhase] = useState<Phase>('loading');
+  const [isFinalized, setIsFinalized] = useState(false);
 
   // ── Setup phase state ──
   const [dailyTasks, setDailyTasks] = useState<AppTask[]>(seedDailyTasks);
@@ -119,6 +166,10 @@ export default function TasksScreen() {
 
   // ── Tracking phase state ──
   const [allTasks, setAllTasks] = useState<AppTask[]>([]);
+
+  // ── Congrats modal ──
+  const [showCongrats, setShowCongrats] = useState(false);
+  const [coinsEarned, setCoinsEarned] = useState(0);
 
   // ── Confirm button animation ──
   const confirmScale = useSharedValue(0);
@@ -143,7 +194,49 @@ export default function TasksScreen() {
     transform: [{ scale: confirmScale.value }],
   }));
 
-  // ── Handlers ──
+  // ── Load initial state on mount ──
+  const loadInitialData = useCallback(async () => {
+    try {
+      const date = gameApi.todayDate();
+      const existing = await gameApi.getDailyTasks(USER_ID, date);
+
+      if (existing.confirmed) {
+        const mapped: AppTask[] = existing.tasks.map((t) => ({
+          id: t.taskId,
+          title: t.title,
+          emoji: assignEmoji(t.title, t.type === 'event' ? 'event' : 'task'),
+          source: (t.type === 'event'
+            ? 'event'
+            : t.type === 'custom'
+            ? 'custom'
+            : 'daily') as 'daily' | 'event' | 'custom',
+          setupStatus: 'fixed' as const,
+          completed: t.isCompleted,
+        }));
+        // Uncompleted first, completed last
+        setAllTasks([
+          ...mapped.filter((t) => !t.completed),
+          ...mapped.filter((t) => t.completed),
+        ]);
+        setIsFinalized(existing.finalized);
+        setPhase('tracking');
+        return;
+      }
+    } catch {
+      // 404 = no tasks confirmed yet — fall through to setup phase
+    }
+    setPhase('setup');
+  }, []);
+
+  // Re-sync from backend whenever this screen comes into focus (e.g. returning
+  // from home where the user may have completed tasks)
+  useFocusEffect(
+    useCallback(() => {
+      loadInitialData();
+    }, [loadInitialData]),
+  );
+
+  // ── Setup handlers ──
 
   const handleFix = (id: string, section: 'daily' | 'event' | 'custom') => {
     const updater = (prev: AppTask[]) =>
@@ -160,25 +253,26 @@ export default function TasksScreen() {
     else setCustomTasks(updater);
   };
 
-  const handleConfirm = () => {
-    const merged = [...dailyTasks, ...events, ...customTasks]
-      .filter((t) => t.setupStatus === 'fixed')
-      .map((t) => ({ ...t, completed: false }));
-    setAllTasks(merged);
-    setPhase('tracking');
-  };
+  const handleConfirm = async () => {
+    const fixed = [...dailyTasks, ...events, ...customTasks].filter(
+      (t) => t.setupStatus === 'fixed',
+    );
 
-  const handleToggleComplete = (taskId: string) => {
-    setAllTasks((prev) => {
-      const updated = prev.map((t) =>
-        t.id === taskId ? { ...t, completed: !t.completed } : t,
-      );
-      // Incomplete tasks float to top, completed sink to bottom
-      return [
-        ...updated.filter((t) => !t.completed),
-        ...updated.filter((t) => t.completed),
-      ];
-    });
+    const backendTasks: Task[] = fixed.map((t) => ({
+      taskId: t.id,
+      title: t.title,
+      type: t.source === 'event' ? 'event' : t.source === 'custom' ? 'custom' : 'task',
+      eventId: t.source === 'event' ? t.id : null,
+      isCompleted: false,
+    }));
+
+    try {
+      await gameApi.confirmTasks(USER_ID, gameApi.todayDate(), backendTasks);
+      setAllTasks(fixed.map((t) => ({ ...t, completed: false })));
+      setPhase('tracking');
+    } catch (e) {
+      console.error('Failed to confirm tasks:', e);
+    }
   };
 
   const handleAddTask = () => {
@@ -189,13 +283,53 @@ export default function TasksScreen() {
       {
         id: `c${Date.now()}`,
         title: trimmed,
-        emoji: '✨',
+        emoji: assignEmoji(trimmed, 'task'),
         source: 'custom',
         setupStatus: 'pending',
         completed: false,
       },
     ]);
     setNewTaskText('');
+  };
+
+  // ── Tracking handlers ──
+
+  const handleFinalizeDay = async () => {
+    try {
+      const result = await gameApi.finalizeDailyTasks(USER_ID, gameApi.todayDate());
+      setCoinsEarned(result.coinsEarned + result.eventBonusCoins);
+      setIsFinalized(true);
+      setShowCongrats(true);
+    } catch (e: any) {
+      // Already finalized from home screen — just mark locally
+      if (e.message?.includes('409') || e.message?.includes('already been finalized')) {
+        setIsFinalized(true);
+      } else {
+        console.error('Failed to finalize day:', e);
+      }
+    }
+  };
+
+  const handleCompleteTask = async (taskId: string) => {
+    if (isFinalized) return;
+
+    try {
+      await gameApi.completeTask(USER_ID, gameApi.todayDate(), taskId);
+
+      const updatedTasks = allTasks.map((t) =>
+        t.id === taskId ? { ...t, completed: true } : t,
+      );
+      setAllTasks([
+        ...updatedTasks.filter((t) => !t.completed),
+        ...updatedTasks.filter((t) => t.completed),
+      ]);
+
+      if (updatedTasks.every((t) => t.completed)) {
+        setTimeout(() => handleFinalizeDay(), 600);
+      }
+    } catch (e) {
+      console.error('Failed to complete task:', e);
+    }
   };
 
   const today = new Date().toLocaleDateString('en-US', {
@@ -207,8 +341,49 @@ export default function TasksScreen() {
   const completedCount = allTasks.filter((t) => t.completed).length;
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Loading screen
+  // ─────────────────────────────────────────────────────────────────────────
+
+  if (phase === 'loading') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color="#5FAD89" />
+          <Text style={styles.loadingText}>Loading your tasks...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safeArea}>
+
+      {/* ── Congrats Modal ── */}
+      <Modal visible={showCongrats} transparent animationType="fade">
+        <View style={congratsStyles.overlay}>
+          <View style={congratsStyles.card}>
+            <Text style={congratsStyles.bigEmoji}>🎉</Text>
+            <Text style={congratsStyles.title}>Congrats!!!</Text>
+            <Text style={congratsStyles.body}>
+              Your tree is watered because of your hard work today!{'\n\n'}
+              You receive{' '}
+              <Text style={congratsStyles.coins}>{coinsEarned} Coins</Text>
+              {' '}for completing all the tasks!
+            </Text>
+            <Pressable
+              style={({ pressed }) => [
+                congratsStyles.acceptBtn,
+                pressed && congratsStyles.acceptBtnPressed,
+              ]}
+              onPress={() => setShowCongrats(false)}
+            >
+              <Text style={congratsStyles.acceptText}>Accept</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -224,7 +399,7 @@ export default function TasksScreen() {
             <Ionicons name="chevron-back" size={22} color="#2D5A3D" />
           </Pressable>
           <View style={styles.headerIconWrap}>
-            <Text style={styles.headerIcon}>🌿</Text>
+            <Text style={styles.headerIcon}>📋</Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>Task List</Text>
@@ -346,7 +521,7 @@ export default function TasksScreen() {
                 </View>
               </View>
 
-              {/* Confirm button — animates in once everything is fixed */}
+              {/* Confirm button */}
               <Animated.View
                 style={[styles.confirmWrap, confirmAnimStyle]}
                 pointerEvents={canConfirm ? 'auto' : 'none'}
@@ -365,7 +540,7 @@ export default function TasksScreen() {
           )}
 
           {/* ════════════════════════════════════════════════════════════════
-              TRACKING PHASE  — single merged section
+              TRACKING PHASE
           ════════════════════════════════════════════════════════════════ */}
           {phase === 'tracking' && (
             <View style={styles.section}>
@@ -384,13 +559,16 @@ export default function TasksScreen() {
                     emoji={task.emoji}
                     subtitle={task.subtitle}
                     completed={task.completed}
-                    onToggleComplete={() => handleToggleComplete(task.id)}
+                    onToggleComplete={() =>
+                      !task.completed && handleCompleteTask(task.id)
+                    }
                   />
                 ))
               )}
 
               {allTasks.length > 0 &&
-                allTasks.every((t) => t.completed) && (
+                allTasks.every((t) => t.completed) &&
+                !showCongrats && (
                   <View style={styles.allDoneRow}>
                     <Text style={styles.allDoneText}>
                       🎉  All done! Amazing work today!
@@ -408,11 +586,87 @@ export default function TasksScreen() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Styles
+// Styles — Congrats Modal
+// ─────────────────────────────────────────────────────────────────────────────
+
+const congratsStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 28,
+  },
+  card: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    paddingHorizontal: 28,
+    paddingTop: 36,
+    paddingBottom: 28,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 28,
+    elevation: 14,
+  },
+  bigEmoji: {
+    fontSize: 64,
+    marginBottom: 14,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#2D5A3D',
+    marginBottom: 14,
+    letterSpacing: -0.5,
+  },
+  body: {
+    fontSize: 15,
+    color: '#555',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  coins: {
+    fontWeight: '800',
+    color: '#D4A017',
+  },
+  acceptBtn: {
+    width: '100%',
+    backgroundColor: '#5FAD89',
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    shadowColor: '#5FAD89',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  acceptBtnPressed: {
+    backgroundColor: '#4A9A76',
+    transform: [{ scale: 0.98 }],
+  },
+  acceptText: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles — Screen
 // ─────────────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F3FAED' },
+
+  // Loading
+  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
+  loadingText: { fontSize: 15, color: '#5FAD89', fontWeight: '600' },
 
   // Header
   header: {
@@ -561,3 +815,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
+

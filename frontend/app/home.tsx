@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'expo-router';
+import { useState, useCallback, useRef } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
 import {
   View,
   Text,
   Image,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   Dimensions,
   Modal,
   ActivityIndicator,
@@ -15,9 +16,8 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { GameColors } from '../constants/theme';
-import { mockDailyTasks } from '@/data/mockTasks';
 import * as gameApi from '@/lib/gameApi';
-import type { GameState, UserStreak, Tree, WarningStatus, WellnessResource } from '@/types/game.type';
+import type { GameState, UserStreak, Tree, WarningStatus, WellnessResource, DailyTask, UserProfile } from '@/types/game.type';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -237,10 +237,43 @@ function TreeVisual({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Home Screen
+// Emoji assignment (same mapping as tasks.tsx)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ALL_TASKS = mockDailyTasks;
+const EMOJI_MAP: { keywords: string[]; emoji: string }[] = [
+  { keywords: ['walk', 'run', 'jog', 'exercise', 'gym', 'workout', 'sport', 'hike', 'bike', 'swim'], emoji: '🏃' },
+  { keywords: ['study', 'read', 'homework', 'assignment', 'lecture', 'exam', 'quiz', 'academic', 'library', 'research'], emoji: '📚' },
+  { keywords: ['meditat', 'mindful', 'yoga', 'breath', 'calm', 'stress', 'relax'], emoji: '🧘' },
+  { keywords: ['water', 'drink', 'hydrat'], emoji: '💧' },
+  { keywords: ['sleep', 'rest', 'nap'], emoji: '😴' },
+  { keywords: ['eat', 'meal', 'food', 'breakfast', 'lunch', 'dinner', 'cook', 'snack', 'nutrition'], emoji: '🥗' },
+  { keywords: ['friend', 'social', 'hang', 'connect', 'people', 'club'], emoji: '🤝' },
+  { keywords: ['write', 'journal', 'reflect', 'diary', 'note'], emoji: '📝' },
+  { keywords: ['music', 'sing', 'instrument', 'art', 'draw', 'paint', 'creat'], emoji: '🎨' },
+  { keywords: ['volunteer', 'service', 'communit', 'help', 'support'], emoji: '🌍' },
+  { keywords: ['career', 'resume', 'intern', 'job', 'network', 'profess', 'workshop'], emoji: '💼' },
+  { keywords: ['stretch', 'warm', 'fit', 'active', 'move', 'dance'], emoji: '🤸' },
+  { keywords: ['call', 'text', 'phone', 'reach out', 'check in', 'message'], emoji: '📱' },
+  { keywords: ['meet', 'attend', 'join', 'visit', 'campus', 'session', 'event'], emoji: '📅' },
+  { keywords: ['clean', 'tidy', 'organize', 'laundry', 'room'], emoji: '🧹' },
+  { keywords: ['gratitude', 'grateful', 'thank', 'positive'], emoji: '🌸' },
+  { keywords: ['outdoor', 'nature', 'park', 'garden', 'fresh air', 'outside'], emoji: '🌳' },
+  { keywords: ['mental', 'health', 'wellness', 'wellbeing', 'self'], emoji: '💚' },
+  { keywords: ['coffee', 'tea', 'cafe'], emoji: '☕' },
+];
+
+function assignEmoji(title: string, type: string): string {
+  if (type === 'event') return '📅';
+  const lower = title.toLowerCase();
+  for (const { keywords, emoji } of EMOJI_MAP) {
+    if (keywords.some((k) => lower.includes(k))) return emoji;
+  }
+  return '✨';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Home Screen
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -252,27 +285,48 @@ export default function HomeScreen() {
   const [tree, setTree] = useState<Tree | null>(null);
   const [warningStatus, setWarningStatus] = useState<WarningStatus>({ type: 'none' });
   const [loading, setLoading] = useState(true);
+  const [username, setUsername] = useState('');
 
-  // ── Local task state ──
-  const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
-  const [visibleTaskIds, setVisibleTaskIds] = useState<string[]>(
-    ALL_TASKS.slice(0, 3).map((t) => t.id),
-  );
+  // ── Daily tasks state ──
+  const [dailyTask, setDailyTask] = useState<DailyTask | null>(null);
 
-  // ── Fetch all data on mount ──
+  // ── Congrats modal ──
+  const [showCongrats, setShowCongrats] = useState(false);
+  const [coinsEarned, setCoinsEarned] = useState(0);
+
+  // Track whether the user already dismissed the wellness/check-in modal this
+  // session so that useFocusEffect re-fetches don't re-show it.
+  const warningDismissedRef = useRef(false);
+
+  // ── Fetch all data — runs on every focus so cross-screen changes sync ──
   const loadData = useCallback(async () => {
     try {
-      const [state, streakData, warning] = await Promise.all([
+      const [state, streakData, warning, profile] = await Promise.all([
         gameApi.getGameState(USER_ID),
         gameApi.getStreak(USER_ID),
         gameApi.getWarningStatus(USER_ID),
+        gameApi.getUserProfile(USER_ID),
       ]);
       setGameState(state);
       setStreak(streakData);
-      setWarningStatus(warning);
+      // Only show the warning modal once per session — don't re-trigger it
+      // every time useFocusEffect fires (e.g. returning from Tasks screen).
+      if (!warningDismissedRef.current) {
+        setWarningStatus(warning);
+      }
+      setUsername(profile.name);
 
       const treeData = await gameApi.getTree(state.currentTreeId);
       setTree(treeData);
+
+      // Load today's confirmed tasks
+      try {
+        const todayTasks = await gameApi.getDailyTasks(USER_ID, gameApi.todayDate());
+        setDailyTask(todayTasks);
+      } catch {
+        // 404 = no tasks confirmed yet for today
+        setDailyTask(null);
+      }
     } catch (e) {
       console.error('Failed to load game data:', e);
     } finally {
@@ -280,37 +334,65 @@ export default function HomeScreen() {
     }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // Re-fetch every time the screen comes into focus (covers initial load +
+  // returning from the Tasks screen after confirming or completing tasks)
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]),
+  );
 
   // ── Fertilizer handlers ──
   const handleUseFertilizer = async () => {
     const updated = await gameApi.useFertilizer(USER_ID);
     setGameState(updated);
+    warningDismissedRef.current = true;
     setWarningStatus({ type: 'none' });
   };
 
   const handleDeclineFertilizer = async () => {
     const updated = await gameApi.declineFertilizer(USER_ID);
     setGameState(updated);
+    warningDismissedRef.current = true;
     setWarningStatus({ type: 'none' });
   };
 
   // ── Task handlers ──
-  const visibleTasks = visibleTaskIds
-    .map((id) => ALL_TASKS.find((t) => t.id === id)!)
-    .filter(Boolean);
+  const handleFinalizeDay = async () => {
+    try {
+      const result = await gameApi.finalizeDailyTasks(USER_ID, gameApi.todayDate());
+      setDailyTask((prev) => (prev ? { ...prev, finalized: true } : prev));
+      setCoinsEarned(result.coinsEarned + result.eventBonusCoins);
+      setShowCongrats(true);
+    } catch (e: any) {
+      if (e.message?.includes('409') || e.message?.includes('already been finalized')) {
+        setDailyTask((prev) => (prev ? { ...prev, finalized: true } : prev));
+      } else {
+        console.error('Failed to finalize day:', e);
+      }
+    }
+  };
 
-  const allTasksDone = completedTaskIds.size > 0 && visibleTasks.length === 0;
+  const handleCompleteTask = async (taskId: string) => {
+    if (!dailyTask || dailyTask.finalized) return;
+    try {
+      await gameApi.completeTask(USER_ID, gameApi.todayDate(), taskId);
+      const updatedTasks = dailyTask.tasks.map((t) =>
+        t.taskId === taskId ? { ...t, isCompleted: true } : t,
+      );
+      setDailyTask({ ...dailyTask, tasks: updatedTasks });
 
-  const handleCompleteTask = (id: string) => {
-    const newCompleted = new Set([...completedTaskIds, id]);
-    setCompletedTaskIds(newCompleted);
+      if (updatedTasks.every((t) => t.isCompleted)) {
+        setTimeout(() => handleFinalizeDay(), 600);
+      }
+    } catch (e) {
+      console.error('Failed to complete task:', e);
+    }
+  };
 
-    const newVisible = visibleTaskIds.filter((tid) => tid !== id);
-    const nextTask = ALL_TASKS.find(
-      (t) => !newCompleted.has(t.id) && !newVisible.includes(t.id),
-    );
-    setVisibleTaskIds(nextTask ? [...newVisible, nextTask.id] : newVisible);
+  const handleAcceptCongrats = async () => {
+    setShowCongrats(false);
+    await loadData(); // refresh coins, water level, and streak in header
   };
 
   // ── Derived values (null-safe) ──
@@ -320,6 +402,14 @@ export default function HomeScreen() {
   const phase = gameState?.currentPhase ?? 'seed';
   const treeName = tree?.name ?? '...';
   const streakCount = streak?.fullCompletionDays ?? 0;
+
+  const uncompletedTasks = (dailyTask?.tasks ?? []).filter((t) => !t.isCompleted);
+  // Show at most 3; as each is completed the next one in the list slides into view
+  const visibleTasks = uncompletedTasks.slice(0, 3);
+  const allTasksDone =
+    dailyTask?.confirmed === true &&
+    (dailyTask?.tasks.length ?? 0) > 0 &&
+    uncompletedTasks.length === 0;
 
   if (loading) {
     return (
@@ -331,6 +421,31 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+
+      {/* ── Congrats Modal ── */}
+      <Modal visible={showCongrats} transparent animationType="fade">
+        <View style={congratsStyles.overlay}>
+          <View style={congratsStyles.card}>
+            <Text style={congratsStyles.bigEmoji}>🎉</Text>
+            <Text style={congratsStyles.title}>Congrats!!!</Text>
+            <Text style={congratsStyles.body}>
+              Your {treeName} is watered because of your hard work today!{'\n\n'}
+              You receive{' '}
+              <Text style={congratsStyles.coins}>{coinsEarned} Coins</Text>
+              {' '}for completing all the tasks!
+            </Text>
+            <Pressable
+              style={({ pressed }) => [
+                congratsStyles.acceptBtn,
+                pressed && congratsStyles.acceptBtnPressed,
+              ]}
+              onPress={handleAcceptCongrats}
+            >
+              <Text style={congratsStyles.acceptText}>Accept</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Fertilizer Modal ── */}
       <FertilizerModal
@@ -349,14 +464,17 @@ export default function HomeScreen() {
           day={warningStatus.day}
           message={warningStatus.message}
           resources={warningStatus.resources}
-          onDismiss={() => setWarningStatus({ type: 'none' })}
+          onDismiss={() => {
+            warningDismissedRef.current = true;
+            setWarningStatus({ type: 'none' });
+          }}
         />
       )}
 
       {/* ── Header ── */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Hello! 👋</Text>
+          <Text style={styles.greeting}>Hello{username ? ` ${username}` : ''}! 👋</Text>
           <Text style={styles.dateText}>
             {new Date().toLocaleDateString('en-US', {
               weekday: 'long',
@@ -393,30 +511,49 @@ export default function HomeScreen() {
         {/* Today's tasks preview */}
         <View style={styles.tasksPreview}>
           <Text style={styles.previewLabel}>Today's Tasks</Text>
-          <View style={styles.tasksList}>
-            {allTasksDone ? (
-              <View style={styles.allDoneWrap}>
-                <Text style={styles.allDoneText}>
-                  All tasks are complete, amazing job! 🎉
-                </Text>
-              </View>
-            ) : (
-              visibleTasks.map((task) => (
+
+          {!dailyTask?.confirmed ? (
+            /* ── Not confirmed yet: prompt user to set up tasks ── */
+            <View style={styles.setupPromptCard}>
+              <Text style={styles.setupPromptText}>
+                🌱 Set up your tasks for today to start growing!
+              </Text>
+              <TouchableOpacity
+                style={styles.setupBtn}
+                onPress={() => router.push('/tasks')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.setupBtnText}>Go to Tasks →</Text>
+              </TouchableOpacity>
+            </View>
+          ) : allTasksDone ? (
+            /* ── All done ── */
+            <View style={styles.allDoneWrap}>
+              <Text style={styles.allDoneText}>
+                All tasks are complete, amazing job! 🎉
+              </Text>
+            </View>
+          ) : (
+            /* ── Show up to 3 uncompleted tasks; next slides in as each is done ── */
+            <View style={styles.tasksList}>
+              {visibleTasks.map((task) => (
                 <TouchableOpacity
-                  key={task.id}
+                  key={task.taskId}
                   style={styles.taskRow}
-                  onPress={() => handleCompleteTask(task.id)}
+                  onPress={() => handleCompleteTask(task.taskId)}
                   activeOpacity={0.7}
                 >
                   <View style={styles.taskCircle} />
-                  <Text style={styles.taskEmoji}>{task.emoji}</Text>
+                  <Text style={styles.taskEmoji}>
+                    {assignEmoji(task.title, task.type)}
+                  </Text>
                   <Text style={styles.taskTitle} numberOfLines={1}>
                     {task.title}
                   </Text>
                 </TouchableOpacity>
-              ))
-            )}
-          </View>
+              ))}
+            </View>
+          )}
         </View>
       </View>
 
@@ -437,6 +574,64 @@ export default function HomeScreen() {
     </SafeAreaView>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles — Congrats Modal
+// ─────────────────────────────────────────────────────────────────────────────
+
+const congratsStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 28,
+  },
+  card: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    paddingHorizontal: 28,
+    paddingTop: 36,
+    paddingBottom: 28,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 28,
+    elevation: 14,
+  },
+  bigEmoji: { fontSize: 64, marginBottom: 14 },
+  title: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#2D5A3D',
+    marginBottom: 14,
+    letterSpacing: -0.5,
+  },
+  body: {
+    fontSize: 15,
+    color: '#555',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  coins: { fontWeight: '800', color: '#D4A017' },
+  acceptBtn: {
+    width: '100%',
+    backgroundColor: GameColors.primary,
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    shadowColor: GameColors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  acceptBtnPressed: { backgroundColor: '#4A9A76', transform: [{ scale: 0.98 }] },
+  acceptText: { fontSize: 17, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.3 },
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Styles — Modal
@@ -800,6 +995,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: GameColors.primary,
     textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+  setupPromptCard: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 8,
+  },
+  setupPromptText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: GameColors.textMid,
+    textAlign: 'center',
+    lineHeight: 21,
+  },
+  setupBtn: {
+    backgroundColor: GameColors.primary,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+    borderRadius: 14,
+  },
+  setupBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
     letterSpacing: 0.2,
   },
 

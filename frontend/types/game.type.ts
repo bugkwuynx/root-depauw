@@ -38,3 +38,31 @@ export type WarningStatus =
   | { type: 'none' }
   | { type: 'wellness_check'; day: number; message: string; resources: WellnessResource[] }
   | { type: 'degradation_warning'; hasFertilizer: boolean };
+
+export interface Task {
+  taskId: string;
+  title: string;
+  type: string;
+  eventId: string | null;
+  isCompleted: boolean;
+}
+
+export interface DailyTask {
+  date: string;
+  tasks: Task[];
+  confirmed: boolean;
+  finalized: boolean;
+}
+
+export interface FinalizeResult {
+  completionState: 'full' | 'partial' | 'none';
+  coinsEarned: number;
+  eventBonusCoins: number;
+  waterApplied: number;
+  gameState: GameState;
+}
+
+export interface UserProfile {
+  name: string;
+  email: string;
+}
