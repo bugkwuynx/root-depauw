@@ -8,6 +8,8 @@ export interface Recommendation {
     goals: string[];
     type: "event" | "task";
     eventId?: string;
+    startTime?: string;
+    endTime?: string;
 }
 
 export interface RecommendationsCollection {

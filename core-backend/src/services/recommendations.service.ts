@@ -47,6 +47,8 @@ export async function getRecommendations(
                     "goals": ["matched userGoal"],
                     "type": "event" | "task",
                     "eventId?": "string (only if type is event)",
+                    "startTime?": "string (only if type is event, ISO format)",
+                    "endTime?": "string (only if type is event, ISO format)"
                 }
             ],
         }

@@ -49,7 +49,6 @@ for (const userId of allUserIds) {
         await finalizeDay(userId, prevDay);
     } catch (err) {
         console.error(`Failed to finalize day for user ${userId}:`, err);
-        continue;
     }
 
     const userDoc = await db.collection('users').doc(userId).get();
