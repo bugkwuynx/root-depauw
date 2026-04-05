@@ -1,3 +1,4 @@
+import { db } from "../database/configFirestore.js";
 import type { GetRecommendationsCollectionServiceRequest, RecommendationsCollection } from "../types/recommendations.type.js";
 import OpenAI from "openai";
 
@@ -46,6 +47,8 @@ export async function getRecommendations(
                     "goals": ["matched userGoal"],
                     "type": "event" | "task",
                     "eventId?": "string (only if type is event)",
+                    "startTime?": "string (only if type is event, ISO format)",
+                    "endTime?": "string (only if type is event, ISO format)"
                 }
             ],
         }
@@ -69,11 +72,26 @@ export async function getRecommendations(
     return recommendationsCollection;
 }
 
+
+export async function getRecommendationsForUser(userId: string, currentDate: string): Promise<RecommendationsCollection | null> {
+    console.log("Fetching recommendations for user:", userId, "on date:", currentDate);
+    
+    const getRecommendations = await db.collection(`users/${userId}/recommendations`).doc(currentDate).get();
+
+    if (!getRecommendations.exists) {
+        console.error("No recommendations found for date:", currentDate);
+        return null;
+    }
+
+    const data = getRecommendations.data() as RecommendationsCollection;
+
+    return data;
+}
 /**
  * Sample input:
  * 
 {  
-    "campusEvents": [
+"campusEvents": [
         {
         "id": "evt001",
         "organizationName": "DePauw Career Center",

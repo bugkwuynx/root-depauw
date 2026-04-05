@@ -121,6 +121,28 @@ export async function useFertilizer(userId: string): Promise<GameState> {
     return toGameState({ ...gameState, ...updatedGameState });
 }
 
+export async function updateTreeId(userId: string, newTreeId: number): Promise<GameState> {
+    if (!getTreeById(newTreeId)) throw new NotFoundError(`Tree ${newTreeId} not found`);
+
+    const gameStateRef = db.doc(gameStatePath(userId));
+    const snap = await gameStateRef.get();
+    if (!snap.exists) throw new NotFoundError(`Game state not found for user ${userId}`);
+
+    const gameState = snap.data() as GameState;
+    const updatedFields: Partial<GameState> = {
+        currentTreeId: newTreeId,
+        lastUpdated: new Date(),
+    };
+
+    await gameStateRef.update(updatedFields as Record<string, unknown>);
+    return toGameState({ ...gameState, ...updatedFields });
+}
+
+export async function fetchCompletedTrees(userId: string): Promise<Tree[]> {
+    const gameState = await getGameState(userId);
+    return TREES.filter((t) => t.treeId < gameState.currentTreeId);
+}
+
 export async function declineFertilizer(userId: string): Promise<GameState> {
     const gameStateRef = db.doc(gameStatePath(userId));
     const userRef = db.doc(userPath(userId));

@@ -23,6 +23,7 @@ export interface ExpoPushResponse {
 export interface SaveTokenRequest extends Request {
     body: {
         token: string;
+        userId?: string;
     }
 }
 

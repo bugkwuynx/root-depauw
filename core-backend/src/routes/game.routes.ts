@@ -6,6 +6,8 @@ import {
     useFertilizerHandler,
     declineFertilizerHandler,
     getWarningStatusHandler,
+    updateTreeIdHandler,
+    getCompletedTreesHandler,
 } from '../controllers/game.controller.js';
 
 const router = Router();
@@ -21,6 +23,12 @@ router.get('/:userId/state', getGameStateHandler);
 
 // GET /api/game/:userId/warning-status
 router.get('/:userId/warning-status', getWarningStatusHandler);
+
+// PATCH /api/game/:userId/tree
+router.patch('/:userId/tree', updateTreeIdHandler);
+
+// GET /api/game/:userId/completed-trees
+router.get('/:userId/completed-trees', getCompletedTreesHandler);
 
 // POST /api/game/:userId/fertilizer/use
 router.post('/:userId/fertilizer/use', useFertilizerHandler);

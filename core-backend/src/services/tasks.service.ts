@@ -1,4 +1,5 @@
 import { db } from '../database/configFirestore.js';
+import { CalendarCompletionState, type CalendarCompletionMap } from '../types/calendar.type.js';
 import type { DailyTask, Task } from '../types/dailyTasks.type.js';
 import type { GameState } from '../types/gameState.type.js';
 import type { UserStreak } from '../types/user.type.js';
@@ -76,6 +77,30 @@ export async function markTaskComplete(userId: string, date: string, taskId: str
     await ref.update({ tasks });
 
     return tasks[taskIndex]!;
+}
+
+export async function getCalendarCompletion(
+    userId: string,
+    year: number,
+    month: number, // 1–12
+): Promise<CalendarCompletionMap> {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const from = `${year}-${pad(month)}-01`;
+    const to   = `${year}-${pad(month)}-31`;
+
+    const snap = await db
+        .collection(`users/${userId}/dailyTasks`)
+        .where('__name__', '>=', from)
+        .where('__name__', '<=', to)
+        .get();
+
+    const result: CalendarCompletionMap = {};
+    snap.forEach((doc) => {
+        const data = doc.data() as { tasks?: Array<{ isCompleted: boolean }> };
+        const state = determineCompletionState((data.tasks ?? []) as import('../types/dailyTasks.type.js').Task[]);
+        result[doc.id] = state === 'full' ? CalendarCompletionState.COMPLETE : state === 'partial' ? CalendarCompletionState.PARTIAL : CalendarCompletionState.NONE;
+    });
+    return result;
 }
 
 export async function finalizeDay(userId: string, date: string): Promise<FinalizeResult> {

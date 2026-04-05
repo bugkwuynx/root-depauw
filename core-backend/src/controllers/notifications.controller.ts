@@ -4,7 +4,7 @@ import type { Request, Response } from "express";
 import { db } from "../database/configFirestore.js";
 
 export const saveToken = async (req: SaveTokenRequest, res: Response) => {
-    const { token } = req.body;
+    const { token, userId } = req.body;
 
     console.log("Received token: ", token);
 
@@ -15,14 +15,16 @@ export const saveToken = async (req: SaveTokenRequest, res: Response) => {
     const findToken = await db.collection("tokens").where("token", "==", token).get();
 
     if (!findToken.empty) {
+        // Update userId if it wasn't set before
+        if (userId) {
+            await db.collection("tokens").doc(token).update({ userId });
+        }
         console.log("Token already exists. Skipping save.");
         return res.json({success: true, message: "Token already exists"});
     }
 
-    await db.collection("tokens").doc(`${token}`).set({ token });
+    await db.collection("tokens").doc(token).set({ token, ...(userId && { userId }) });
 
-    // console.log(`Token saved. Total devices: ${await db.collection("tokens").get().then(snap => snap.size)}`);
-    
     res.json({success: true, message: "Token saved successfully"});
 }
 
