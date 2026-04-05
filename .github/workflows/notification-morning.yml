@@ -1,8 +1,10 @@
 name: Morning Notification (Daily 8am ET)
 
 on:
+  push:
+    branches: [uyen/phase-3]
   schedule:
-    - cron: "0 12 * * *"  # 12:00 UTC = 8:00am EDT (UTC-4)
+    - cron: "0 12 * * *" # 12:00 UTC = 8:00am EDT (UTC-4)
   workflow_dispatch:
 
 jobs:

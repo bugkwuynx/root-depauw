@@ -1,9 +1,11 @@
 name: Reminder Notifications (12pm and 6:30pm ET)
 
 on:
+  push:
+    branches: [uyen/phase-3]
   schedule:
-    - cron: "0 16 * * *"   # 16:00 UTC = 12:00pm EDT (UTC-4)
-    - cron: "30 22 * * *"  # 22:30 UTC = 6:30pm EDT (UTC-4)
+    - cron: "0 16 * * *" # 16:00 UTC = 12:00pm EDT (UTC-4)
+    - cron: "30 22 * * *" # 22:30 UTC = 6:30pm EDT (UTC-4)
   workflow_dispatch:
 
 jobs:
