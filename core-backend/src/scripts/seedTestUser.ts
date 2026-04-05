@@ -10,9 +10,9 @@ const user = {
     email: 'test@depauw.edu',
     name: 'Tra',
     streak: {
-        fullCompletionDays: 0,
+        fullCompletionDays: 6,
         partialCompletionDays: 0,
-        zeroCompletionDays: 7,
+        zeroCompletionDays: 0,
         lastFullCompletionDate: new Date(),
         lastZeroDate: new Date(),
         warningIssued: false,
@@ -23,9 +23,9 @@ const gameState = {
     coins: 62,
     waterAppliedToPhase: 6,
     currentTreeId: 1,
-    currentPhase: TreePhase.Seedling,
+    currentPhase: TreePhase.Sapling,
     fertilizer: 0,
-    pendingDegradation: true,   // set true so fertilizer endpoints are testable immediately
+    pendingDegradation: false,   // set true so fertilizer endpoints are testable immediately
     lastUpdated: new Date(),
 };
 

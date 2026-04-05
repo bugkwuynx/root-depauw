@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -172,6 +172,11 @@ export default function TasksScreen() {
   const [showCongrats, setShowCongrats] = useState(false);
   const [coinsEarned, setCoinsEarned] = useState(0);
 
+  // ── Coin popup (per-task completion) ──
+  const [showCoinPopup, setShowCoinPopup] = useState(false);
+  const [coinPopupTitle, setCoinPopupTitle] = useState('');
+  const coinPopupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // ── Confirm button animation ──
   const confirmScale = useSharedValue(0);
   const confirmOpacity = useSharedValue(0);
@@ -317,6 +322,7 @@ export default function TasksScreen() {
     try {
       await gameApi.completeTask(USER_ID, gameApi.todayDate(), taskId);
 
+      const task = allTasks.find((t) => t.id === taskId);
       const updatedTasks = allTasks.map((t) =>
         t.id === taskId ? { ...t, completed: true } : t,
       );
@@ -324,6 +330,14 @@ export default function TasksScreen() {
         ...updatedTasks.filter((t) => !t.completed),
         ...updatedTasks.filter((t) => t.completed),
       ]);
+
+      // Show coin popup for this task
+      if (task) {
+        setCoinPopupTitle(task.title);
+        setShowCoinPopup(true);
+        if (coinPopupTimerRef.current) clearTimeout(coinPopupTimerRef.current);
+        coinPopupTimerRef.current = setTimeout(() => setShowCoinPopup(false), 2500);
+      }
 
       if (updatedTasks.every((t) => t.completed)) {
         setTimeout(() => handleFinalizeDay(), 600);
@@ -359,6 +373,19 @@ export default function TasksScreen() {
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safeArea}>
+
+      {/* ── Coin Popup (per-task) ── */}
+      <Modal visible={showCoinPopup} transparent animationType="fade" statusBarTranslucent>
+        <Pressable style={coinPopupStyles.overlay} onPress={() => setShowCoinPopup(false)}>
+          <View style={coinPopupStyles.card}>
+            <FontAwesome5 name="coins" size={26} color="#D4A017" />
+            <Text style={coinPopupStyles.amount}>+5 Coins!</Text>
+            <Text style={coinPopupStyles.label} numberOfLines={2}>
+              "{coinPopupTitle}"
+            </Text>
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* ── Congrats Modal ── */}
       <Modal visible={showCongrats} transparent animationType="fade">
@@ -589,6 +616,47 @@ export default function TasksScreen() {
     </SafeAreaView>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles — Coin Popup
+// ─────────────────────────────────────────────────────────────────────────────
+
+const coinPopupStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  card: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 20,
+    paddingHorizontal: 28,
+    paddingVertical: 22,
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    shadowColor: '#D4A017',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  amount: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#D4A017',
+    letterSpacing: -0.3,
+  },
+  label: {
+    fontSize: 13,
+    color: '#92710A',
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Styles — Congrats Modal

@@ -17,7 +17,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { GameColors } from '../constants/theme';
 import * as gameApi from '@/lib/gameApi';
-import type { GameState, UserStreak, Tree, WarningStatus, WellnessResource, DailyTask, UserProfile } from '@/types/game.type';
+import type { GameState, UserStreak, Tree, WarningStatus, WellnessResource, DailyTask } from '@/types/game.type';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -79,55 +79,81 @@ function FertilizerModal({
     try { await action(); } finally { setBusy(false); }
   };
 
+  if (!hasFertilizer) {
+    return (
+      <Modal visible={visible} transparent animationType="fade">
+        <View style={modal.overlay}>
+          <View style={noFertStyles.card}>
+            <View style={noFertStyles.iconCircle}>
+              <Text style={noFertStyles.sadEmoji}>🪴</Text>
+            </View>
+            <View style={noFertStyles.warningBanner}>
+              <Text style={noFertStyles.warningBannerText}>⚠️  Tree Regression Warning</Text>
+            </View>
+            <Text style={noFertStyles.title}>No Fertilizer Left</Text>
+            <Text style={noFertStyles.body}>
+              Your <Text style={noFertStyles.treeName}>{treeName}</Text> is about to regress to the previous phase.{'\n\n'}
+              You have no fertilizers left to protect it. Complete more tasks to earn fertilizers!
+            </Text>
+            <View style={noFertStyles.tipRow}>
+              <Text style={noFertStyles.tipText}>💡 Tip: Streak completions reward you with fertilizers</Text>
+            </View>
+            {busy ? (
+              <ActivityIndicator color="#C05A00" style={{ marginTop: 20 }} />
+            ) : (
+              <TouchableOpacity
+                style={noFertStyles.acceptBtn}
+                onPress={() => handle(onDecline)}
+                activeOpacity={0.8}
+              >
+                <Text style={noFertStyles.acceptBtnText}>Accept Regression</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={modal.overlay}>
         <View style={modal.card}>
-          <Text style={modal.bigEmoji}>{hasFertilizer ? '🌿' : '😢'}</Text>
+          <Text style={modal.bigEmoji}>🌿</Text>
 
-          <Text style={modal.title}>
-            {hasFertilizer ? 'Your Tree Needs Help!' : 'No Fertilizer Left'}
-          </Text>
+          <Text style={modal.title}>Your Tree Needs Help!</Text>
 
           <Text style={modal.body}>
-            {hasFertilizer
-              ? `Your ${treeName} is about to regress to the previous phase of growth.\n\nUse a fertilizer to protect it!`
-              : `Your ${treeName} is about to regress to the previous phase.\n\nYou have no fertilizers left to protect it.`}
+            {`Your ${treeName} is about to regress to the previous phase of growth.\n\nUse a fertilizer to protect it!`}
           </Text>
 
-          {hasFertilizer && (
-            <View style={modal.fertRow}>
-              <Image
-                source={require('../assets/icons/fertilizer.png')}
-                style={modal.fertIcon}
-              />
-              <Text style={modal.fertCount}>
-                {fertilizerCount} fertilizer{fertilizerCount !== 1 ? 's' : ''} available
-              </Text>
-            </View>
-          )}
+          <View style={modal.fertRow}>
+            <Image
+              source={require('../assets/icons/fertilizer.png')}
+              style={modal.fertIcon}
+            />
+            <Text style={modal.fertCount}>
+              {fertilizerCount} fertilizer{fertilizerCount !== 1 ? 's' : ''} available
+            </Text>
+          </View>
 
           {busy ? (
             <ActivityIndicator color={GameColors.primary} style={{ marginTop: 20 }} />
           ) : (
             <View style={modal.buttonCol}>
-              {hasFertilizer && (
-                <TouchableOpacity
-                  style={modal.primaryBtn}
-                  onPress={() => handle(onUse)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={modal.primaryBtnText}>Use Fertilizer 🌿</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={modal.primaryBtn}
+                onPress={() => handle(onUse)}
+                activeOpacity={0.8}
+              >
+                <Text style={modal.primaryBtnText}>Use Fertilizer 🌿</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={modal.secondaryBtn}
                 onPress={() => handle(onDecline)}
                 activeOpacity={0.8}
               >
-                <Text style={modal.secondaryBtnText}>
-                  {hasFertilizer ? 'Let it regress' : 'Accept regression'}
-                </Text>
+                <Text style={modal.secondaryBtnText}>Let it regress</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -294,6 +320,21 @@ export default function HomeScreen() {
   const [showCongrats, setShowCongrats] = useState(false);
   const [coinsEarned, setCoinsEarned] = useState(0);
 
+  // ── Phase-up modal ──
+  const [showPhaseUp, setShowPhaseUp] = useState(false);
+  const [nextPhase, setNextPhase] = useState('');
+  const pendingPhaseUpRef = useRef<string | null>(null);
+
+  // ── Streak reward modal ──
+  const [showStreakReward, setShowStreakReward] = useState(false);
+  const [streakMilestone, setStreakMilestone] = useState(7);
+  const pendingStreakRef = useRef<number | null>(null);
+
+  // ── Coin popup (per-task completion) ──
+  const [showCoinPopup, setShowCoinPopup] = useState(false);
+  const [coinPopupTitle, setCoinPopupTitle] = useState('');
+  const coinPopupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Track whether the user already dismissed the wellness/check-in modal this
   // session so that useFocusEffect re-fetches don't re-show it.
   const warningDismissedRef = useRef(false);
@@ -360,9 +401,28 @@ export default function HomeScreen() {
   // ── Task handlers ──
   const handleFinalizeDay = async () => {
     try {
+      const oldPhase = phase;
+      const oldStreakCount = streak?.fullCompletionDays ?? 0;
+
       const result = await gameApi.finalizeDailyTasks(USER_ID, gameApi.todayDate());
       setDailyTask((prev) => (prev ? { ...prev, finalized: true } : prev));
       setCoinsEarned(result.coinsEarned + result.eventBonusCoins);
+
+      // Phase change — use the gameState already returned by finalize (no extra API call)
+      if (result.gameState.currentPhase !== oldPhase) {
+        pendingPhaseUpRef.current = result.gameState.currentPhase;
+      }
+
+      // Streak milestone check (7-day and every 7 days after)
+      try {
+        const newStreakData = await gameApi.getStreak(USER_ID);
+        const newCount = newStreakData.fullCompletionDays;
+        if (newCount > 0 && newCount % 7 === 0 && oldStreakCount % 7 !== 0) {
+          pendingStreakRef.current = newCount;
+        }
+      } catch {}
+
+      // Show congrats AFTER all pending flags are set, before any UI data refresh
       setShowCongrats(true);
     } catch (e: any) {
       if (e.message?.includes('409') || e.message?.includes('already been finalized')) {
@@ -377,10 +437,19 @@ export default function HomeScreen() {
     if (!dailyTask || dailyTask.finalized) return;
     try {
       await gameApi.completeTask(USER_ID, gameApi.todayDate(), taskId);
+      const task = dailyTask.tasks.find((t) => t.taskId === taskId);
       const updatedTasks = dailyTask.tasks.map((t) =>
         t.taskId === taskId ? { ...t, isCompleted: true } : t,
       );
       setDailyTask({ ...dailyTask, tasks: updatedTasks });
+
+      // Show coin popup for this task
+      if (task) {
+        setCoinPopupTitle(task.title);
+        setShowCoinPopup(true);
+        if (coinPopupTimerRef.current) clearTimeout(coinPopupTimerRef.current);
+        coinPopupTimerRef.current = setTimeout(() => setShowCoinPopup(false), 2500);
+      }
 
       if (updatedTasks.every((t) => t.isCompleted)) {
         setTimeout(() => handleFinalizeDay(), 600);
@@ -390,9 +459,40 @@ export default function HomeScreen() {
     }
   };
 
-  const handleAcceptCongrats = async () => {
+  // Chain: congrats → streak reward (if any) → phase-up (if any) → loadData
+  // loadData (which updates all header stats) is deferred until every modal is dismissed
+  const handleAcceptCongrats = () => {
     setShowCongrats(false);
-    await loadData(); // refresh coins, water level, and streak in header
+    if (pendingStreakRef.current) {
+      const days = pendingStreakRef.current;
+      pendingStreakRef.current = null;
+      setStreakMilestone(days);
+      setShowStreakReward(true);
+    } else if (pendingPhaseUpRef.current) {
+      const p = pendingPhaseUpRef.current;
+      pendingPhaseUpRef.current = null;
+      setNextPhase(p);
+      setShowPhaseUp(true);
+    } else {
+      loadData();
+    }
+  };
+
+  const handleDismissStreakReward = () => {
+    setShowStreakReward(false);
+    if (pendingPhaseUpRef.current) {
+      const p = pendingPhaseUpRef.current;
+      pendingPhaseUpRef.current = null;
+      setNextPhase(p);
+      setShowPhaseUp(true);
+    } else {
+      loadData();
+    }
+  };
+
+  const handleDismissPhaseUp = () => {
+    setShowPhaseUp(false);
+    loadData();
   };
 
   // ── Derived values (null-safe) ──
@@ -445,6 +545,76 @@ export default function HomeScreen() {
             </Pressable>
           </View>
         </View>
+      </Modal>
+
+      {/* ── Streak Reward Modal ── */}
+      <Modal visible={showStreakReward} transparent animationType="fade">
+        <View style={congratsStyles.overlay}>
+          <View style={streakRewardStyles.card}>
+            <View style={streakRewardStyles.flameBg}>
+              <Text style={streakRewardStyles.flameEmoji}>🔥</Text>
+            </View>
+            <View style={streakRewardStyles.badgeRow}>
+              <Text style={streakRewardStyles.badgeText}>{streakMilestone}-DAY STREAK</Text>
+            </View>
+            <Text style={streakRewardStyles.title}>Incredible Consistency!</Text>
+            <Text style={streakRewardStyles.body}>
+              You've completed all your tasks for{' '}
+              <Text style={streakRewardStyles.highlight}>{streakMilestone} days in a row</Text>
+              !{'\n\n'}
+              As a reward you've earned{' '}
+              <Text style={streakRewardStyles.reward}>bonus coins and 1 fertilizer</Text>
+              {' '}to help your tree grow.{'\n\n'}
+              Keep it up tomorrow! 💪
+            </Text>
+            <Pressable
+              style={({ pressed }) => [streakRewardStyles.btn, pressed && streakRewardStyles.btnPressed]}
+              onPress={handleDismissStreakReward}
+            >
+              <Text style={streakRewardStyles.btnText}>Claim Rewards! 🎁</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Phase-Up Modal ── */}
+      <Modal visible={showPhaseUp} transparent animationType="fade">
+        <View style={congratsStyles.overlay}>
+          <View style={phaseUpStyles.card}>
+            <View style={phaseUpStyles.badgeRow}>
+              <Text style={phaseUpStyles.badgeText}>LEVEL UP</Text>
+            </View>
+            <Text style={phaseUpStyles.phaseEmoji}>{PHASE_EMOJIS[nextPhase] ?? '🌳'}</Text>
+            <Text style={phaseUpStyles.title}>Your tree grew!</Text>
+            <Text style={phaseUpStyles.body}>
+              <Text style={phaseUpStyles.treeName}>{treeName}</Text>
+              {' has grown into a '}
+              <Text style={phaseUpStyles.phaseName}>{PHASE_LABELS[nextPhase] ?? nextPhase}</Text>
+              {'!\n\nYou\'ve been awarded '}
+              <Text style={phaseUpStyles.reward}>bonus coins and 1 fertilizer</Text>
+              {' for reaching this milestone.\n\nKeep up the great work tomorrow! 🌟'}
+            </Text>
+            <Pressable
+              style={({ pressed }) => [phaseUpStyles.btn, pressed && phaseUpStyles.btnPressed]}
+              onPress={handleDismissPhaseUp}
+            >
+              <Text style={phaseUpStyles.btnText}>Amazing! Keep Growing 🌱</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Coin Popup (per-task) ── */}
+      <Modal visible={showCoinPopup} transparent animationType="fade" statusBarTranslucent>
+        <Pressable style={coinPopupStyles.overlay} onPress={() => setShowCoinPopup(false)}>
+          <View style={coinPopupStyles.card}>
+            <FontAwesome5 name="coins" size={28} color="#D4A017" />
+            <Text style={coinPopupStyles.amount}>+5 Coins!</Text>
+            <Text style={coinPopupStyles.label} numberOfLines={2}>
+              "{coinPopupTitle}"
+            </Text>
+          </View>
+        </Pressable>
       </Modal>
 
       {/* ── Fertilizer Modal ── */}
@@ -634,6 +804,199 @@ const congratsStyles = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Styles — Streak Reward Modal
+// ─────────────────────────────────────────────────────────────────────────────
+
+const streakRewardStyles = StyleSheet.create({
+  card: {
+    width: '100%',
+    backgroundColor: '#FFF8F0',
+    borderRadius: 28,
+    paddingHorizontal: 28,
+    paddingTop: 28,
+    paddingBottom: 28,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#F0A030',
+    shadowColor: '#C05A00',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 28,
+    elevation: 14,
+  },
+  flameBg: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#FEE9C5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+    borderWidth: 2,
+    borderColor: '#F0C070',
+  },
+  flameEmoji: {
+    fontSize: 46,
+  },
+  badgeRow: {
+    backgroundColor: '#E8830A',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    marginBottom: 14,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 2,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#7C3700',
+    marginBottom: 12,
+    letterSpacing: -0.5,
+    textAlign: 'center',
+  },
+  body: {
+    fontSize: 15,
+    color: '#7C5026',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  highlight: { fontWeight: '800', color: '#E8830A' },
+  reward: { fontWeight: '800', color: '#D4A017' },
+  btn: {
+    width: '100%',
+    backgroundColor: '#E8830A',
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    shadowColor: '#E8830A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  btnPressed: { backgroundColor: '#C05A00', transform: [{ scale: 0.98 }] },
+  btnText: { fontSize: 17, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.3 },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles — Phase-Up Modal
+// ─────────────────────────────────────────────────────────────────────────────
+
+const phaseUpStyles = StyleSheet.create({
+  card: {
+    width: '100%',
+    backgroundColor: '#F0FAF4',
+    borderRadius: 28,
+    paddingHorizontal: 28,
+    paddingTop: 28,
+    paddingBottom: 28,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#83BF99',
+    shadowColor: '#2D5A3D',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 28,
+    elevation: 14,
+  },
+  badgeRow: {
+    backgroundColor: '#5FAD89',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    marginBottom: 14,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 2,
+  },
+  phaseEmoji: {
+    fontSize: 72,
+    marginBottom: 10,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#2D5A3D',
+    marginBottom: 12,
+    letterSpacing: -0.5,
+  },
+  body: {
+    fontSize: 15,
+    color: '#555',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  treeName: { fontWeight: '800', color: '#2D5A3D' },
+  phaseName: { fontWeight: '800', color: '#5FAD89' },
+  reward: { fontWeight: '800', color: '#D4A017' },
+  btn: {
+    width: '100%',
+    backgroundColor: '#5FAD89',
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    shadowColor: '#5FAD89',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  btnPressed: { backgroundColor: '#4A9A76', transform: [{ scale: 0.98 }] },
+  btnText: { fontSize: 17, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.3 },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles — Coin Popup
+// ─────────────────────────────────────────────────────────────────────────────
+
+const coinPopupStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 60,
+  },
+  card: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 20,
+    paddingHorizontal: 28,
+    paddingVertical: 22,
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    shadowColor: '#D4A017',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  amount: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#D4A017',
+    letterSpacing: -0.3,
+  },
+  label: {
+    fontSize: 13,
+    color: '#92710A',
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Styles — Modal
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -730,6 +1093,112 @@ const modal = StyleSheet.create({
     color: '#888',
     fontSize: 14,
     fontWeight: '600',
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles — No-Fertilizer Modal (redesigned)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const noFertStyles = StyleSheet.create({
+  card: {
+    width: '100%',
+    backgroundColor: '#FFF8F0',
+    borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 24,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#F0C070',
+    shadowColor: '#C05A00',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  iconCircle: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#FEE9C5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+    borderWidth: 2,
+    borderColor: '#F0C070',
+  },
+  sadEmoji: {
+    fontSize: 48,
+  },
+  warningBanner: {
+    backgroundColor: '#FEE9C5',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#F0C070',
+  },
+  warningBannerText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#C05A00',
+    letterSpacing: 0.5,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#7C3700',
+    marginBottom: 10,
+    letterSpacing: -0.3,
+    textAlign: 'center',
+  },
+  body: {
+    fontSize: 14,
+    color: '#7C5026',
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 14,
+  },
+  treeName: {
+    fontWeight: '800',
+    color: '#C05A00',
+  },
+  tipRow: {
+    backgroundColor: '#FFF3DC',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    width: '100%',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#F5D68A',
+  },
+  tipText: {
+    fontSize: 12,
+    color: '#92710A',
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 17,
+  },
+  acceptBtn: {
+    width: '100%',
+    backgroundColor: '#C05A00',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    shadowColor: '#C05A00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  acceptBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
 });
 

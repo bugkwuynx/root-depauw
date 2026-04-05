@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { FontAwesome5 } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -81,7 +82,8 @@ export function SetupTaskItem({
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           {coinBonus != null ? (
             <View style={styles.coinBadge}>
-              <Text style={styles.coinText}>+{coinBonus} 🪙</Text>
+              <FontAwesome5 name="coins" size={10} color="#92710A" />
+              <Text style={styles.coinText}>+{coinBonus}</Text>
             </View>
           ) : null}
         </View>
@@ -257,10 +259,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFBEB',
     borderRadius: 8,
     paddingHorizontal: 7,
-    paddingVertical: 2,
+    paddingVertical: 3,
     alignSelf: 'flex-start',
     borderWidth: 1,
     borderColor: '#FDE68A',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   coinText: { fontSize: 11, color: '#92710A', fontWeight: '700' },
 
