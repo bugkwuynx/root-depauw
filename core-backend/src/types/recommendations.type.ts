@@ -15,7 +15,7 @@ export interface Recommendation {
 export interface RecommendationsCollection {
     date: string;
     recommendations: Recommendation[];
-    generatedAt: Date;
+    generatedAt: string;
 }
 
 export interface DePauwEvent {

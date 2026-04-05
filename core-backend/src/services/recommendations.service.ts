@@ -83,9 +83,13 @@ export async function getRecommendationsForUser(userId: string, currentDate: str
         return null;
     }
 
-    const data = getRecommendations.data() as RecommendationsCollection;
+    const data = getRecommendations.data();
 
-    return data;
+    return {
+        date: data?.date,
+        recommendations: data?.recommendations,
+        generatedAt: data?.generatedAt.toDate().toISOString()
+    };
 }
 /**
  * Sample input:
