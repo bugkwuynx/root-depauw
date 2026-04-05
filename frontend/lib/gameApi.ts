@@ -1,6 +1,6 @@
 import type { GameState, UserStreak, Tree, WarningStatus } from '@/types/game.type';
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:3000';
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BACKEND_URL}${endpoint}`, {

@@ -11,7 +11,7 @@ const user = {
     streak: {
         fullCompletionDays: 0,
         partialCompletionDays: 0,
-        zeroCompletionDays: 0,
+        zeroCompletionDays: 4,   // 4 = triggers day 5 wellness check
         lastFullCompletionDate: new Date(),
         lastZeroDate: new Date(),
         warningIssued: false,
@@ -24,7 +24,7 @@ const gameState = {
     currentTreeId: 1,
     currentPhase: TreePhase.Seedling,
     fertilizer: 3,
-    pendingDegradation: true,   // set true so fertilizer endpoints are testable immediately
+    pendingDegradation: false,  // false so wellness check shows instead of fertilizer modal
     lastUpdated: new Date(),
 };
 
