@@ -1,0 +1,33 @@
+import type { GameState, UserStreak, Tree, WarningStatus } from '@/types/game.type';
+
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+
+async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${BACKEND_URL}${endpoint}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { message?: string }).message ?? `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+export const getGameState = (userId: string) =>
+  request<GameState>(`/api/game/${userId}/state`);
+
+export const getStreak = (userId: string) =>
+  request<UserStreak>(`/api/game/${userId}/streak`);
+
+export const getWarningStatus = (userId: string) =>
+  request<WarningStatus>(`/api/game/${userId}/warning-status`);
+
+export const getTree = (treeId: number) =>
+  request<Tree>(`/api/game/trees/${treeId}`);
+
+export const useFertilizer = (userId: string) =>
+  request<GameState>(`/api/game/${userId}/fertilizer/use`, { method: 'POST' });
+
+export const declineFertilizer = (userId: string) =>
+  request<GameState>(`/api/game/${userId}/fertilizer/decline`, { method: 'POST' });

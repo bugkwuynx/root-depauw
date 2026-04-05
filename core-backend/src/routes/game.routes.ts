@@ -6,6 +6,7 @@ import {
     useFertilizerHandler,
     declineFertilizerHandler,
     getWarningStatusHandler,
+    getStreakHandler,
 } from '../controllers/game.controller.js';
 
 const router = Router();
@@ -18,6 +19,9 @@ router.get('/trees/:treeId', getTreeHandler);
 
 // GET /api/game/:userId/state
 router.get('/:userId/state', getGameStateHandler);
+
+// GET /api/game/:userId/streak
+router.get('/:userId/streak', getStreakHandler);
 
 // GET /api/game/:userId/warning-status
 router.get('/:userId/warning-status', getWarningStatusHandler);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import {
   View,
@@ -7,54 +7,44 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
+  Modal,
+  ActivityIndicator,
+  ScrollView,
+  Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { GameColors } from '../constants/theme';
 import { mockDailyTasks } from '@/data/mockTasks';
+import * as gameApi from '@/lib/gameApi';
+import type { GameState, UserStreak, Tree, WarningStatus, WellnessResource } from '@/types/game.type';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Types & constants
+// Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-type TreePhase = 'seed' | 'seedling' | 'sapling' | 'young_tree' | 'full_grown';
+// TODO: replace with userId from auth context once teammate's PR is merged
+const USER_ID = 'testUser123';
 
 const WATER_PER_PHASE = 7;
 
-const PHASE_LABELS: Record<TreePhase, string> = {
+const PHASE_LABELS: Record<string, string> = {
   seed: 'Seed',
   seedling: 'Seedling',
   sapling: 'Sapling',
-  young_tree: 'Young Tree',
-  full_grown: 'Full Grown',
+  young: 'Young Tree',
+  full: 'Full Grown',
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Mock data (replace with Firestore hooks)
-// ─────────────────────────────────────────────────────────────────────────────
-
-const MOCK_USER = { name: 'Alex' };
-
-const MOCK_GAME_STATE = {
-  currentTree: {
-    id: 'tree-001',
-    name: 'Bambu',
-    phase: 'sapling' as TreePhase,
-    waterUnits: 4,
-    totalWater: 18,
-    createdAt: '2025-03-01',
-  },
-  coins: 340,
-  waterToday: false,
-  streak: { currentStreak: 5, zeroStreak: 0, longestStreak: 12 },
-  fertilizers: 2,
+const PHASE_EMOJIS: Record<string, string> = {
+  seed: '🌱',
+  seedling: '🌿',
+  sapling: '🪴',
+  young: '🌳',
+  full: '🌲',
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Nav items
-// ─────────────────────────────────────────────────────────────────────────────
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 const NAV_ITEMS = [
   { label: 'Tasks',    icon: 'checkmark-done-circle-outline' as const, route: '/tasks'         },
@@ -64,32 +54,165 @@ const NAV_ITEMS = [
 ] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tree Visual
+// Fertilizer Modal
 // ─────────────────────────────────────────────────────────────────────────────
 
-function TreeVisual({ phase, waterUnits, name }: { phase: TreePhase; waterUnits: number; name: string }) {
-  const treeEmojis: Record<TreePhase, string> = {
-    seed: '🌱',
-    seedling: '🌿',
-    sapling: '🪴',
-    young_tree: '🌳',
-    full_grown: '🌲',
+function FertilizerModal({
+  visible,
+  hasFertilizer,
+  fertilizerCount,
+  treeName,
+  onUse,
+  onDecline,
+}: {
+  visible: boolean;
+  hasFertilizer: boolean;
+  fertilizerCount: number;
+  treeName: string;
+  onUse: () => Promise<void>;
+  onDecline: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  const handle = async (action: () => Promise<void>) => {
+    setBusy(true);
+    try { await action(); } finally { setBusy(false); }
   };
 
   return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={modal.overlay}>
+        <View style={modal.card}>
+          <Text style={modal.bigEmoji}>{hasFertilizer ? '🌿' : '😢'}</Text>
+
+          <Text style={modal.title}>
+            {hasFertilizer ? 'Your Tree Needs Help!' : 'No Fertilizer Left'}
+          </Text>
+
+          <Text style={modal.body}>
+            {hasFertilizer
+              ? `Your ${treeName} is about to regress to the previous phase of growth.\n\nUse a fertilizer to protect it!`
+              : `Your ${treeName} is about to regress to the previous phase.\n\nYou have no fertilizers left to protect it.`}
+          </Text>
+
+          {hasFertilizer && (
+            <View style={modal.fertRow}>
+              <Image
+                source={require('../assets/icons/fertilizer.png')}
+                style={modal.fertIcon}
+              />
+              <Text style={modal.fertCount}>
+                {fertilizerCount} fertilizer{fertilizerCount !== 1 ? 's' : ''} available
+              </Text>
+            </View>
+          )}
+
+          {busy ? (
+            <ActivityIndicator color={GameColors.primary} style={{ marginTop: 20 }} />
+          ) : (
+            <View style={modal.buttonCol}>
+              {hasFertilizer && (
+                <TouchableOpacity
+                  style={modal.primaryBtn}
+                  onPress={() => handle(onUse)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={modal.primaryBtnText}>Use Fertilizer 🌿</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={modal.secondaryBtn}
+                onPress={() => handle(onDecline)}
+                activeOpacity={0.8}
+              >
+                <Text style={modal.secondaryBtnText}>
+                  {hasFertilizer ? 'Let it regress' : 'Accept regression'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Wellness Warning Modal (days 5-7 of zero completions)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function WellnessModal({
+  visible,
+  day,
+  message,
+  resources,
+  onDismiss,
+}: {
+  visible: boolean;
+  day: number;
+  message: string;
+  resources: WellnessResource[];
+  onDismiss: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={modal.overlay}>
+        <View style={[modal.card, modal.wellnessCard]}>
+          <Text style={modal.bigEmoji}>💙</Text>
+          <Text style={modal.title}>Day {day} Check-In</Text>
+          <Text style={modal.body}>{message}</Text>
+
+          <View style={wellness.divider} />
+
+          <Text style={wellness.resourcesLabel}>Support Resources</Text>
+          <ScrollView style={wellness.resourcesList} showsVerticalScrollIndicator={false}>
+            {resources.map((r, i) => (
+              <View key={i} style={wellness.resourceRow}>
+                <Text style={wellness.resourceName}>{r.name}</Text>
+                <TouchableOpacity onPress={() => Linking.openURL(`tel:${r.contact.replace(/\D/g, '')}`)}>
+                  <Text style={wellness.resourceContact}>{r.contact}</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+
+          <TouchableOpacity
+            style={[modal.primaryBtn, wellness.okBtn]}
+            onPress={onDismiss}
+            activeOpacity={0.8}
+          >
+            <Text style={modal.primaryBtnText}>I'm okay, I'll get back on track!</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tree Visual
+// ─────────────────────────────────────────────────────────────────────────────
+
+function TreeVisual({
+  phase,
+  waterUnits,
+  name,
+}: {
+  phase: string;
+  waterUnits: number;
+  name: string;
+}) {
+  return (
     <View style={styles.treeContainer}>
-      {/* Name + phase at top */}
       <View style={styles.treeTopInfo}>
         <Text style={styles.treeName}>{name}</Text>
-        <Text style={styles.treePhaseLabel}>{PHASE_LABELS[phase]}</Text>
+        <Text style={styles.treePhaseLabel}>{PHASE_LABELS[phase] ?? phase}</Text>
       </View>
 
-      {/* Emoji centered in remaining space */}
       <View style={styles.treeEmojiWrap}>
-        <Text style={styles.treeEmoji}>{treeEmojis[phase]}</Text>
+        <Text style={styles.treeEmoji}>{PHASE_EMOJIS[phase] ?? '🌱'}</Text>
       </View>
 
-      {/* Water bar at bottom */}
       <View style={styles.treeBottom}>
         <View style={styles.waterMeterRow}>
           {Array.from({ length: WATER_PER_PHASE }).map((_, i) => (
@@ -120,17 +243,59 @@ function TreeVisual({ phase, waterUnits, name }: { phase: TreePhase; waterUnits:
 const ALL_TASKS = mockDailyTasks;
 
 export default function HomeScreen() {
-  const [gameState] = useState(MOCK_GAME_STATE);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  // IDs of completed tasks
+  // ── Remote state ──
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [streak, setStreak] = useState<UserStreak | null>(null);
+  const [tree, setTree] = useState<Tree | null>(null);
+  const [warningStatus, setWarningStatus] = useState<WarningStatus>({ type: 'none' });
+  const [loading, setLoading] = useState(true);
+
+  // ── Local task state ──
   const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
-  // IDs currently shown in the preview (up to 3 at a time)
   const [visibleTaskIds, setVisibleTaskIds] = useState<string[]>(
     ALL_TASKS.slice(0, 3).map((t) => t.id),
   );
 
+  // ── Fetch all data on mount ──
+  const loadData = useCallback(async () => {
+    try {
+      const [state, streakData, warning] = await Promise.all([
+        gameApi.getGameState(USER_ID),
+        gameApi.getStreak(USER_ID),
+        gameApi.getWarningStatus(USER_ID),
+      ]);
+      setGameState(state);
+      setStreak(streakData);
+      setWarningStatus(warning);
+
+      const treeData = await gameApi.getTree(state.currentTreeId);
+      setTree(treeData);
+    } catch (e) {
+      console.error('Failed to load game data:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // ── Fertilizer handlers ──
+  const handleUseFertilizer = async () => {
+    const updated = await gameApi.useFertilizer(USER_ID);
+    setGameState(updated);
+    setWarningStatus({ type: 'none' });
+  };
+
+  const handleDeclineFertilizer = async () => {
+    const updated = await gameApi.declineFertilizer(USER_ID);
+    setGameState(updated);
+    setWarningStatus({ type: 'none' });
+  };
+
+  // ── Task handlers ──
   const visibleTasks = visibleTaskIds
     .map((id) => ALL_TASKS.find((t) => t.id === id)!)
     .filter(Boolean);
@@ -148,12 +313,50 @@ export default function HomeScreen() {
     setVisibleTaskIds(nextTask ? [...newVisible, nextTask.id] : newVisible);
   };
 
+  // ── Derived values (null-safe) ──
+  const coins = gameState?.coins ?? 0;
+  const fertilizer = gameState?.fertilizer ?? 0;
+  const waterUnits = gameState?.waterAppliedToPhase ?? 0;
+  const phase = gameState?.currentPhase ?? 'seed';
+  const treeName = tree?.name ?? '...';
+  const streakCount = streak?.fullCompletionDays ?? 0;
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={GameColors.primary} />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+
+      {/* ── Fertilizer Modal ── */}
+      <FertilizerModal
+        visible={warningStatus.type === 'degradation_warning'}
+        hasFertilizer={warningStatus.type === 'degradation_warning' && warningStatus.hasFertilizer}
+        fertilizerCount={fertilizer}
+        treeName={treeName}
+        onUse={handleUseFertilizer}
+        onDecline={handleDeclineFertilizer}
+      />
+
+      {/* ── Wellness Warning Modal ── */}
+      {warningStatus.type === 'wellness_check' && (
+        <WellnessModal
+          visible
+          day={warningStatus.day}
+          message={warningStatus.message}
+          resources={warningStatus.resources}
+          onDismiss={() => setWarningStatus({ type: 'none' })}
+        />
+      )}
+
       {/* ── Header ── */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Hello, {MOCK_USER.name}!</Text>
+          <Text style={styles.greeting}>Hello! 👋</Text>
           <Text style={styles.dateText}>
             {new Date().toLocaleDateString('en-US', {
               weekday: 'long',
@@ -167,29 +370,25 @@ export default function HomeScreen() {
         <View style={styles.headerStats}>
           <View style={styles.statBadge}>
             <Ionicons name="flame" size={16} color={GameColors.crossText} />
-            <Text style={styles.statText}>{gameState.streak.currentStreak}</Text>
+            <Text style={styles.statText}>{streakCount}</Text>
           </View>
           <View style={styles.coinBadge}>
             <FontAwesome5 name="coins" size={13} color={GameColors.coinText} />
-            <Text style={styles.coinText}>{gameState.coins}</Text>
+            <Text style={styles.coinText}>{coins}</Text>
           </View>
           <View style={styles.fertBadge}>
             <Image
               source={require('../assets/icons/fertilizer.png')}
               style={styles.fertIcon}
             />
-            <Text style={styles.fertText}>{gameState.fertilizers}</Text>
+            <Text style={styles.fertText}>{fertilizer}</Text>
           </View>
         </View>
       </View>
 
       {/* ── Main content ── */}
       <View style={styles.mainContent}>
-        <TreeVisual
-          phase={gameState.currentTree.phase}
-          waterUnits={gameState.currentTree.waterUnits}
-          name={gameState.currentTree.name}
-        />
+        <TreeVisual phase={phase} waterUnits={waterUnits} name={treeName} />
 
         {/* Today's tasks preview */}
         <View style={styles.tasksPreview}>
@@ -240,13 +439,161 @@ export default function HomeScreen() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Styles
+// Styles — Modal
+// ─────────────────────────────────────────────────────────────────────────────
+
+const modal = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  card: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    paddingHorizontal: 28,
+    paddingTop: 32,
+    paddingBottom: 28,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  wellnessCard: {
+    maxHeight: SCREEN_HEIGHT * 0.78,
+  },
+  bigEmoji: {
+    fontSize: 56,
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1A1A1A',
+    textAlign: 'center',
+    marginBottom: 12,
+    letterSpacing: -0.3,
+  },
+  body: {
+    fontSize: 14,
+    color: '#555',
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 16,
+  },
+  fertRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5E8D0',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    gap: 8,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#D4A96A',
+  },
+  fertIcon: {
+    width: 18,
+    height: 18,
+  },
+  fertCount: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#7C5026',
+  },
+  buttonCol: {
+    width: '100%',
+    gap: 10,
+    marginTop: 20,
+  },
+  primaryBtn: {
+    backgroundColor: GameColors.primary,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  primaryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.1,
+  },
+  secondaryBtn: {
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#DADADA',
+  },
+  secondaryBtnText: {
+    color: '#888',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles — Wellness Modal extras
+// ─────────────────────────────────────────────────────────────────────────────
+
+const wellness = StyleSheet.create({
+  divider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: '#EBEBEB',
+    marginBottom: 14,
+  },
+  resourcesLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#999',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+  },
+  resourcesList: {
+    width: '100%',
+    maxHeight: 160,
+    marginBottom: 16,
+  },
+  resourceRow: {
+    marginBottom: 12,
+  },
+  resourceName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  resourceContact: {
+    fontSize: 13,
+    color: GameColors.primary,
+    textDecorationLine: 'underline',
+  },
+  okBtn: {
+    width: '100%',
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles — Screen
 // ─────────────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: GameColors.bgLight,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // ── Header ──────────────────────────────────────────────────────────────────
@@ -306,7 +653,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: GameColors.coinText,
   },
-  // Pastel brown fertilizer badge
   fertBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -344,7 +690,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: GameColors.bgSection,
   },
-  // Name + phase pinned at top
   treeTopInfo: {
     alignItems: 'center',
     paddingTop: 18,
@@ -363,7 +708,6 @@ const styles = StyleSheet.create({
     letterSpacing: 3.5,
     textTransform: 'uppercase',
   },
-  // Emoji fills remaining height, centered
   treeEmojiWrap: {
     flex: 1,
     justifyContent: 'center',
@@ -372,7 +716,6 @@ const styles = StyleSheet.create({
   treeEmoji: {
     fontSize: 160,
   },
-  // Water bar sits at bottom with its own padding
   treeBottom: {
     alignItems: 'center',
     paddingBottom: 18,

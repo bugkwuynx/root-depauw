@@ -6,6 +6,7 @@ import {
     useFertilizer,
     declineFertilizer,
     getWarningStatus,
+    getStreak,
 } from '../services/game.service.js';
 import { NotFoundError, ConflictError, ValidationError } from '../utils/errors.js';
 
@@ -67,6 +68,17 @@ export async function declineFertilizerHandler(req: Request, res: Response): Pro
     } catch (err) {
         if (err instanceof NotFoundError) { res.status(404).json({ error: err.message }); return; }
         if (err instanceof ConflictError) { res.status(409).json({ error: err.message }); return; }
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+export async function getStreakHandler(req: Request, res: Response): Promise<void> {
+    const { userId } = req.params as { userId: string };
+    try {
+        const streak = await getStreak(userId);
+        res.json(streak);
+    } catch (err) {
+        if (err instanceof NotFoundError) { res.status(404).json({ error: err.message }); return; }
         res.status(500).json({ error: 'Internal server error' });
     }
 }
