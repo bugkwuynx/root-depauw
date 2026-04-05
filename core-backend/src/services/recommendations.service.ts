@@ -1,5 +1,5 @@
 import { db } from "../database/configFirestore.js";
-import type { GetRecommendationsCollectionServiceRequest, RecommendationsCollection } from "../types/recommendations.type.js";
+import { fromFirestore, type GetRecommendationsCollectionServiceRequest, type RecommendationsCollection, type RecommendationsCollectionDocument } from "../types/recommendations.type.js";
 import OpenAI from "openai";
 
 export async function getRecommendations(
@@ -83,7 +83,7 @@ export async function getRecommendationsForUser(userId: string, currentDate: str
         return null;
     }
 
-    const data = getRecommendations.data() as RecommendationsCollection;
+    const data = fromFirestore(getRecommendations.data() as RecommendationsCollectionDocument);
 
     return data;
 }
