@@ -956,8 +956,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   tasksList: {
-    flex: 1,
-    justifyContent: 'space-evenly',
+    justifyContent: 'flex-start',
+    gap: 8,
   },
   taskRow: {
     flexDirection: 'row',

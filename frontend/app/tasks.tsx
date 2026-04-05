@@ -17,8 +17,9 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
   withTiming,
+  LinearTransition,
+  Easing,
 } from 'react-native-reanimated';
 import { SetupTaskItem, TrackingTaskItem } from '@/components/TaskItem';
 import { mockDailyTasks, mockSuggestedEvents, mockCustomTasks } from '@/data/mockTasks';
@@ -182,10 +183,10 @@ export default function TasksScreen() {
   useEffect(() => {
     if (canConfirm) {
       confirmOpacity.value = withTiming(1, { duration: 300 });
-      confirmScale.value = withSpring(1, { damping: 12, stiffness: 160 });
+      confirmScale.value = withTiming(1, { duration: 280, easing: Easing.out(Easing.back(1.15)) });
     } else {
       confirmOpacity.value = withTiming(0, { duration: 180 });
-      confirmScale.value = withSpring(0, { damping: 14 });
+      confirmScale.value = withTiming(0, { duration: 180, easing: Easing.in(Easing.quad) });
     }
   }, [canConfirm]);
 
@@ -553,16 +554,20 @@ export default function TasksScreen() {
                 <EmptyState message="No tasks for today!" />
               ) : (
                 allTasks.map((task) => (
-                  <TrackingTaskItem
+                  <Animated.View
                     key={task.id}
-                    title={task.title}
-                    emoji={task.emoji}
-                    subtitle={task.subtitle}
-                    completed={task.completed}
-                    onToggleComplete={() =>
-                      !task.completed && handleCompleteTask(task.id)
-                    }
-                  />
+                    layout={LinearTransition.duration(320).easing(Easing.out(Easing.quad))}
+                  >
+                    <TrackingTaskItem
+                      title={task.title}
+                      emoji={task.emoji}
+                      subtitle={task.subtitle}
+                      completed={task.completed}
+                      onToggleComplete={() =>
+                        !task.completed && handleCompleteTask(task.id)
+                      }
+                    />
+                  </Animated.View>
                 ))
               )}
 
@@ -798,13 +803,11 @@ const styles = StyleSheet.create({
   allDoneRow: {
     marginTop: 6,
     padding: 14,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#C8EDD8',
     borderRadius: 14,
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#83BF99',
   },
-  allDoneText: { fontSize: 14, fontWeight: '700', color: '#5FAD89' },
+  allDoneText: { fontSize: 14, fontWeight: '700', color: '#2D5A3D' },
 
   backBtn: {
     width: 40,

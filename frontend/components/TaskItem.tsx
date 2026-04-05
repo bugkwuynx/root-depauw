@@ -3,8 +3,8 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
   withTiming,
+  Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
@@ -35,16 +35,8 @@ export function SetupTaskItem({
   const cardTranslateX = useSharedValue(0);
   const buttonsOpacity = useSharedValue(1);
   const buttonsScale = useSharedValue(1);
-  const badgeOpacity = useSharedValue(0);
   const checkScale = useSharedValue(1);
   const crossScale = useSharedValue(1);
-
-  // Fade in the "added ✓" badge when isFixed flips to true
-  useEffect(() => {
-    if (isFixed) {
-      badgeOpacity.value = withTiming(1, { duration: 220 });
-    }
-  }, [isFixed]);
 
   const cardStyle = useAnimatedStyle(() => ({
     opacity: cardOpacity.value,
@@ -54,7 +46,6 @@ export function SetupTaskItem({
     opacity: buttonsOpacity.value,
     transform: [{ scale: buttonsScale.value }],
   }));
-  const badgeStyle = useAnimatedStyle(() => ({ opacity: badgeOpacity.value }));
   const checkAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: checkScale.value }],
   }));
@@ -67,7 +58,7 @@ export function SetupTaskItem({
   const handleFix = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     buttonsOpacity.value = withTiming(0, { duration: 180 });
-    buttonsScale.value = withSpring(0.3, { damping: 14 });
+    buttonsScale.value = withTiming(0.3, { duration: 180, easing: Easing.in(Easing.quad) });
     setTimeout(onFix, 210);
   };
 
@@ -96,20 +87,16 @@ export function SetupTaskItem({
         </View>
       </View>
 
-      {/* Right: X/V buttons or locked badge */}
-      {isFixed ? (
-        <Animated.View style={[styles.lockedBadge, badgeStyle]}>
-          <Text style={styles.lockedText}>added ✓</Text>
-        </Animated.View>
-      ) : (
+      {/* Right: X/V buttons (hidden once fixed) */}
+      {!isFixed && (
         <Animated.View style={[styles.buttons, buttonsStyle]}>
           {/* X — delete */}
           <Pressable
             onPressIn={() => {
-              crossScale.value = withSpring(0.75, { damping: 10 });
+              crossScale.value = withTiming(0.8, { duration: 80, easing: Easing.out(Easing.quad) });
             }}
             onPressOut={() => {
-              crossScale.value = withSpring(1, { damping: 10 });
+              crossScale.value = withTiming(1, { duration: 150, easing: Easing.out(Easing.quad) });
             }}
             onPress={handleDelete}
             hitSlop={8}
@@ -122,10 +109,10 @@ export function SetupTaskItem({
           {/* V — lock in */}
           <Pressable
             onPressIn={() => {
-              checkScale.value = withSpring(0.75, { damping: 10 });
+              checkScale.value = withTiming(0.8, { duration: 80, easing: Easing.out(Easing.quad) });
             }}
             onPressOut={() => {
-              checkScale.value = withSpring(1, { damping: 10 });
+              checkScale.value = withTiming(1, { duration: 150, easing: Easing.out(Easing.quad) });
             }}
             onPress={handleFix}
             hitSlop={8}
@@ -163,7 +150,7 @@ export function TrackingTaskItem({
   const progress = useSharedValue(completed ? 1 : 0);
 
   useEffect(() => {
-    progress.value = withSpring(completed ? 1 : 0, { damping: 13, stiffness: 180 });
+    progress.value = withTiming(completed ? 1 : 0, { duration: 220, easing: Easing.out(Easing.quad) });
   }, [completed]);
 
   const fillStyle = useAnimatedStyle(() => ({
@@ -298,17 +285,6 @@ const styles = StyleSheet.create({
     borderColor: '#83BF99',
   },
   checkText: { fontSize: 18, color: '#5FAD89', fontWeight: '700' },
-
-  // Locked badge (after V pressed)
-  lockedBadge: {
-    backgroundColor: '#E8F5EE',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: '#83BF99',
-  },
-  lockedText: { fontSize: 11, color: '#5FAD89', fontWeight: '700' },
 
   // Tracking completion circle
   circleWrapper: {
