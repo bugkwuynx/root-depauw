@@ -1,5 +1,5 @@
 import { db } from "../database/configFirestore.js";
-import { fromFirestore, type GetRecommendationsCollectionServiceRequest, type RecommendationsCollection } from "../types/recommendations.type.js";
+import { fromFirestore, type GetRecommendationsCollectionServiceRequest, type RecommendationsCollection, type RecommendationsCollectionDocument } from "../types/recommendations.type.js";
 import OpenAI from "openai";
 
 export async function getRecommendations(
