@@ -15,6 +15,7 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^25.5.0",
     "concurrently": "^9.2.1",
@@ -23,9 +24,11 @@
     "typescript": "^6.0.2"
   },
   "dependencies": {
+    "cors": "^2.8.6",
     "axios": "^1.14.0",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "firebase-admin": "^13.7.0"
+    "firebase-admin": "^13.7.0",
+    "openai": "^6.33.0"
   }
 }

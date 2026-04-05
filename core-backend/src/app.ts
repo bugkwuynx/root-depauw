@@ -1,18 +1,33 @@
 // src/app.ts
-
 import express from 'express';
+import cors from 'cors';
 import dotenv from 'dotenv';
+import gameRoutes from './routes/game.routes.js';
+import tasksRoutes from './routes/tasks.routes.js';
+import notificationsRouter from './routes/notifications.route.js';
 
 dotenv.config();
 
-const app = express();
-const port = 5000;
+import recommendationsRouter from "./routes/recommendations.route.js";
 
-app.get('/', (req, res)=>
-{
-     res.send('Hello World');
+const app = express();
+const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+
+app.use(cors());
+app.use(express.json());
+app.use('/api/notifications', notificationsRouter);
+app.use('/api/game', gameRoutes);
+app.use('/api/tasks', tasksRoutes);
+app.use('/api/recommendations', recommendationsRouter);
+
+app.get('/', (_req, res) => {
+    res.send('root@depauw backend');
 });
 
-app.listen(port, ()=>{
-     console.log(`Connected successfully on port ${port}`);
+app.use((_req, res) => {
+    res.status(404).json({ error: 'Not found' });
+});
+
+app.listen(port, () => {
+    console.log(`Connected successfully on port ${port}`);
 });
