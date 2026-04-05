@@ -32,8 +32,8 @@ console.log(`Crawled ${campusEvents.length} events, ${todaysEvents.length} of wh
 console.log('Today\'s events:', campusEvents);
 
 const getAllUsers = await db.collection('users').get();
-// const allUserIds = getAllUsers.docs.map(doc => doc.id);
-const allUserIds = ['test-user-finalize-job']; // TODO: replace with actual user IDs from Firestore
+const allUserIds = getAllUsers.docs.map(doc => doc.id);
+// const allUserIds = ['test-user-finalize-job']; // TODO: replace with actual user IDs from Firestore
 
 const today = new Date().toISOString().split('T')[0];
 // Use date arithmetic to avoid DST edge cases
