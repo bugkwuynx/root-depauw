@@ -47,6 +47,15 @@ export interface GetRecommendationsControllerRequest extends Request {
     body: GetRecommendationsCollectionServiceRequest;
 }
 
+export interface GetRecommendationsForUserControllerRequest extends Request {
+    params: {
+        userId: string;
+    },
+    query: {
+        currentDate: string;
+    }
+}
+
 export interface RecommendationsCollectionDocument extends Omit<RecommendationsCollection, 'generatedAt'> {
     generatedAt: Timestamp;
 }
