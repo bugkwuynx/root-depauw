@@ -8,6 +8,8 @@ export interface Recommendation {
     goals: string[];
     type: "event" | "task";
     eventId?: string;
+    startTime?: string;
+    endTime?: string;
 }
 
 export interface RecommendationsCollection {
@@ -45,6 +47,15 @@ export interface GetRecommendationsControllerRequest extends Request {
         userId: string;
     }
     body: GetRecommendationsCollectionServiceRequest;
+}
+
+export interface GetRecommendationsForUserControllerRequest extends Request {
+    params: {
+        userId: string;
+    },
+    query: {
+        currentDate: string;
+    }
 }
 
 export interface RecommendationsCollectionDocument extends Omit<RecommendationsCollection, 'generatedAt'> {
