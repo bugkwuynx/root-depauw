@@ -1,4 +1,4 @@
-const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_BASE_URL;
+const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
 export type CalendarDayCompletionState = 'complete' | 'partial' | 'none';
 

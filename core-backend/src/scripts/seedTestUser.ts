@@ -8,8 +8,11 @@ const TEST_USER_ID = 'testUser123';
 
 const user = {
     email: 'test@depauw.edu',
+    name: 'Tra',
+    goals: ['physical wellness', 'academic success', 'social connection', 'mental health', 'career growth'],
+    preferences: { notificationsEnabled: true },
     streak: {
-        fullCompletionDays: 0,
+        fullCompletionDays: 6,
         partialCompletionDays: 0,
         zeroCompletionDays: 0,
         lastFullCompletionDate: new Date(),
@@ -19,21 +22,27 @@ const user = {
 };
 
 const gameState = {
-    coins: 50,
-    waterAppliedToPhase: 2,
+    coins: 62,
+    waterAppliedToPhase: 6,
     currentTreeId: 1,
-    currentPhase: TreePhase.Seedling,
-    fertilizer: 3,
-    pendingDegradation: true,   // set true so fertilizer endpoints are testable immediately
+    currentPhase: TreePhase.Young,
+    fertilizer: 0,
+    pendingDegradation: false,   // set true so fertilizer endpoints are testable immediately
     lastUpdated: new Date(),
 };
 
+const TODAY = new Date().toISOString().split('T')[0]!;
+
 await db.doc(`users/${TEST_USER_ID}`).set(user);
+console.log(`✓ user written (zeroCompletionDays=${user.streak.zeroCompletionDays})`);
+
 await db.doc(`users/${TEST_USER_ID}/gameState/data`).set(gameState);
+console.log(`✓ gameState written (coins=${gameState.coins}, pendingDegradation=${gameState.pendingDegradation})`);
 
-console.log(`Seeded user "${TEST_USER_ID}" with pendingDegradation=true and fertilizer=3`);
-console.log(`Test endpoints:`);
-console.log(`  POST /api/game/${TEST_USER_ID}/fertilizer/use`);
-console.log(`  POST /api/game/${TEST_USER_ID}/fertilizer/decline`);
+await db.doc(`users/${TEST_USER_ID}/dailyTasks/${TODAY}`).delete();
+console.log(`✓ dailyTasks/${TODAY} cleared`);
 
-process.exit(0);
+await db.doc(`users/${TEST_USER_ID}/recommendations/${TODAY}`).delete();
+console.log(`✓ recommendations/${TODAY} cleared`);
+
+console.log(`\nDone — no process.exit so writes fully flush before Node exits`);

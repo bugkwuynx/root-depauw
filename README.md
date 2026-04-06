@@ -1,5 +1,7 @@
 # root@depauw
 
+## Privacy Policy
+We do not collect any data for third-party
 
 ## Frontend
 
