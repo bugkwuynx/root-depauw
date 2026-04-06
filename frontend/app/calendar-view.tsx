@@ -202,7 +202,7 @@ export default function CalendarViewScreen() {
   const [completionMap, setCompletionMap] =
     React.useState<RichCalendarDayCompletionMap>({});
   const [loading, setLoading] = React.useState(true);
-  const userId = "1";
+  const userId = "testUser123";
 
   // Fetch completion data whenever the visible month or userId changes
   React.useEffect(() => {

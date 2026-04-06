@@ -6,6 +6,8 @@ export interface Task {
     type: string;
     eventId: string | null;
     isCompleted: boolean;
+    description?: string;
+    goals?: string[];
 }
 
 export interface DailyTask {

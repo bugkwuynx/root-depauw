@@ -30,6 +30,10 @@ app.use((_req, res) => {
     res.status(404).json({ error: 'Not found' });
 });
 
-app.listen(port, () => {
-    console.log(`Connected successfully on port ${port}`);
-});
+if (process.env.VERCEL !== '1') {
+    app.listen(port, () => {
+        console.log(`Connected successfully on port ${port}`);
+    });
+}
+
+export default app;

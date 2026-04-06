@@ -8,8 +8,10 @@ import {
     getWarningStatus,
     updateTreeId,
     fetchCompletedTrees,
+    getStreak,
 } from '../services/game.service.js';
 import { NotFoundError, ConflictError, ValidationError } from '../utils/errors.js';
+import { db } from '../database/configFirestore.js';
 
 export async function getGameStateHandler(req: Request, res: Response): Promise<void> {
     const { userId } = req.params as { userId: string };
@@ -97,6 +99,29 @@ export async function declineFertilizerHandler(req: Request, res: Response): Pro
     } catch (err) {
         if (err instanceof NotFoundError) { res.status(404).json({ error: err.message }); return; }
         if (err instanceof ConflictError) { res.status(409).json({ error: err.message }); return; }
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+export async function getStreakHandler(req: Request, res: Response): Promise<void> {
+    const { userId } = req.params as { userId: string };
+    try {
+        const streak = await getStreak(userId);
+        res.json(streak);
+    } catch (err) {
+        if (err instanceof NotFoundError) { res.status(404).json({ error: err.message }); return; }
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+export async function getUserProfileHandler(req: Request, res: Response): Promise<void> {
+    const { userId } = req.params as { userId: string };
+    try {
+        const snap = await db.doc(`users/${userId}`).get();
+        if (!snap.exists) { res.status(404).json({ error: 'User not found' }); return; }
+        const data = snap.data() as { name?: string; email?: string };
+        res.json({ name: data.name ?? 'Friend', email: data.email ?? '' });
+    } catch {
         res.status(500).json({ error: 'Internal server error' });
     }
 }
