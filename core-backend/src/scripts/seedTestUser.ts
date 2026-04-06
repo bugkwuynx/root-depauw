@@ -12,7 +12,7 @@ const user = {
     goals: ['physical wellness', 'academic success', 'social connection', 'mental health', 'career growth'],
     preferences: { notificationsEnabled: true },
     streak: {
-        fullCompletionDays: 6,
+        fullCompletionDays: 20,
         partialCompletionDays: 0,
         zeroCompletionDays: 0,
         lastFullCompletionDate: new Date(),
@@ -25,8 +25,8 @@ const gameState = {
     coins: 62,
     waterAppliedToPhase: 6,
     currentTreeId: 1,
-    currentPhase: TreePhase.Young,
-    fertilizer: 0,
+    currentPhase: TreePhase.Full,
+    fertilizer: 4,
     pendingDegradation: false,   // set true so fertilizer endpoints are testable immediately
     lastUpdated: new Date(),
 };

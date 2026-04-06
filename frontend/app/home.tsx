@@ -35,13 +35,22 @@ const PHASE_LABELS: Record<string, string> = {
   full: 'Full Grown',
 };
 
-const PHASE_EMOJIS: Record<string, string> = {
-  seed: '🌱',
-  seedling: '🌿',
-  sapling: '🪴',
-  young: '🌳',
-  full: '🌲',
+// Per-tree phase emojis: TREE_PHASE_EMOJIS[treeId][phase]
+const TREE_PHASE_EMOJIS: Record<number, Record<string, string>> = {
+  1: { seed: '🌰', seedling: '🌱', sapling: '🌿', young: '🌳', full: '🌲' }, // Oak Sapling
+  2: { seed: '🌰', seedling: '🌱', sapling: '🌿', young: '🌸', full: '💐' }, // Cherry Blossom
+  3: { seed: '🌱', seedling: '🪴', sapling: '🌵', young: '🌵', full: '🌵' }, // Cactus
 };
+
+const TREE_NAMES: Record<number, string> = {
+  1: 'Oak Sapling',
+  2: 'Cherry Blossom',
+  3: 'Cactus',
+};
+
+function getPhaseEmoji(treeId: number, phase: string): string {
+  return TREE_PHASE_EMOJIS[treeId]?.[phase] ?? '🌱';
+}
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -219,10 +228,12 @@ function WellnessModal({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function TreeVisual({
+  treeId,
   phase,
   waterUnits,
   name,
 }: {
+  treeId: number;
   phase: string;
   waterUnits: number;
   name: string;
@@ -235,7 +246,7 @@ function TreeVisual({
       </View>
 
       <View style={styles.treeEmojiWrap}>
-        <Text style={styles.treeEmoji}>{PHASE_EMOJIS[phase] ?? '🌱'}</Text>
+        <Text style={styles.treeEmoji}>{getPhaseEmoji(treeId, phase)}</Text>
       </View>
 
       <View style={styles.treeBottom}>
@@ -325,6 +336,12 @@ export default function HomeScreen() {
   const [showPhaseUp, setShowPhaseUp] = useState(false);
   const [nextPhase, setNextPhase] = useState('');
   const pendingPhaseUpRef = useRef<string | null>(null);
+
+  // ── Tree-complete modal ──
+  const [showTreeComplete, setShowTreeComplete] = useState(false);
+  const [completedTreeName, setCompletedTreeName] = useState('');
+  const [nextTreeName, setNextTreeName] = useState('');
+  const pendingTreeCompleteRef = useRef<{ completedName: string; nextName: string } | null>(null);
 
   // ── Streak reward modal ──
   const [showStreakReward, setShowStreakReward] = useState(false);
@@ -421,25 +438,35 @@ export default function HomeScreen() {
     setShowDayComplete(false);
     try {
       const oldPhase = phase;
+      const oldTreeId = gameState?.currentTreeId ?? 1;
       const oldStreakCount = streak?.fullCompletionDays ?? 0;
 
       const result = await gameApi.finalizeDailyTasks(userId, gameApi.todayDate());
       setDailyTask((prev) => (prev ? { ...prev, finalized: true } : prev));
       setCoinsEarned(result.coinsEarned + result.eventBonusCoins);
 
-      // Phase change detected from finalize result
-      if (result.gameState.currentPhase !== oldPhase) {
+      // Tree completion: treeId advanced (full phase finished)
+      if (result.gameState.currentTreeId !== oldTreeId) {
+        const newId = result.gameState.currentTreeId;
+        pendingTreeCompleteRef.current = {
+          completedName: treeName,
+          nextName: TREE_NAMES[newId] ?? 'New Tree',
+        };
+      } else if (result.gameState.currentPhase !== oldPhase) {
+        // Normal phase advance
         pendingPhaseUpRef.current = result.gameState.currentPhase;
       }
 
-      // Streak milestone check
+      // Streak milestone check — compute from oldStreakCount before the backend resets it
+      if (result.completionState === 'full') {
+        const wouldBeCount = oldStreakCount + 1;
+        if (wouldBeCount % 7 === 0) {
+          pendingStreakRef.current = wouldBeCount;
+        }
+      }
       try {
         const newStreakData = await gameApi.getStreak(userId);
         setStreak(newStreakData);
-        const newCount = newStreakData.fullCompletionDays;
-        if (newCount > 0 && newCount % 7 === 0 && oldStreakCount % 7 !== 0) {
-          pendingStreakRef.current = newCount;
-        }
       } catch {}
 
       setShowCongrats(true);
@@ -487,8 +514,7 @@ export default function HomeScreen() {
     }
   };
 
-  // Chain: congrats → streak reward (if any) → phase-up (if any) → loadData
-  // loadData (which updates all header stats) is deferred until every modal is dismissed
+  // Chain: congrats → streak reward → tree complete → phase-up → loadData
   const handleAcceptCongrats = () => {
     setShowCongrats(false);
     if (pendingStreakRef.current) {
@@ -496,6 +522,12 @@ export default function HomeScreen() {
       pendingStreakRef.current = null;
       setStreakMilestone(days);
       setShowStreakReward(true);
+    } else if (pendingTreeCompleteRef.current) {
+      const { completedName, nextName } = pendingTreeCompleteRef.current;
+      pendingTreeCompleteRef.current = null;
+      setCompletedTreeName(completedName);
+      setNextTreeName(nextName);
+      setShowTreeComplete(true);
     } else if (pendingPhaseUpRef.current) {
       const p = pendingPhaseUpRef.current;
       pendingPhaseUpRef.current = null;
@@ -508,7 +540,13 @@ export default function HomeScreen() {
 
   const handleDismissStreakReward = () => {
     setShowStreakReward(false);
-    if (pendingPhaseUpRef.current) {
+    if (pendingTreeCompleteRef.current) {
+      const { completedName, nextName } = pendingTreeCompleteRef.current;
+      pendingTreeCompleteRef.current = null;
+      setCompletedTreeName(completedName);
+      setNextTreeName(nextName);
+      setShowTreeComplete(true);
+    } else if (pendingPhaseUpRef.current) {
       const p = pendingPhaseUpRef.current;
       pendingPhaseUpRef.current = null;
       setNextPhase(p);
@@ -516,6 +554,11 @@ export default function HomeScreen() {
     } else {
       loadData();
     }
+  };
+
+  const handleDismissTreeComplete = () => {
+    setShowTreeComplete(false);
+    loadData();
   };
 
   const handleDismissPhaseUp = () => {
@@ -635,7 +678,7 @@ export default function HomeScreen() {
             <View style={phaseUpStyles.badgeRow}>
               <Text style={phaseUpStyles.badgeText}>LEVEL UP</Text>
             </View>
-            <Text style={phaseUpStyles.phaseEmoji}>{PHASE_EMOJIS[nextPhase] ?? '🌳'}</Text>
+            <Text style={phaseUpStyles.phaseEmoji}>{getPhaseEmoji(gameState?.currentTreeId ?? 1, nextPhase)}</Text>
             <Text style={phaseUpStyles.title}>Your tree grew!</Text>
             <Text style={phaseUpStyles.body}>
               <Text style={phaseUpStyles.treeName}>{treeName}</Text>
@@ -650,6 +693,36 @@ export default function HomeScreen() {
               onPress={handleDismissPhaseUp}
             >
               <Text style={phaseUpStyles.btnText}>Amazing! Keep Growing 🌱</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Tree Complete Modal ── */}
+      <Modal visible={showTreeComplete} transparent animationType="fade">
+        <View style={congratsStyles.overlay}>
+          <View style={phaseUpStyles.card}>
+            <View style={[phaseUpStyles.badgeRow, treeCompleteStyles.badgeRow]}>
+              <Text style={phaseUpStyles.badgeText}>🌳 FULLY GROWN</Text>
+            </View>
+            <Text style={phaseUpStyles.phaseEmoji}>🎉</Text>
+            <Text style={phaseUpStyles.title}>Tree Complete!</Text>
+            <Text style={phaseUpStyles.body}>
+              {'Your '}
+              <Text style={phaseUpStyles.treeName}>{completedTreeName}</Text>
+              {' is fully grown and has been added to your '}
+              <Text style={phaseUpStyles.reward}>Tree Collection</Text>
+              {'!\n\nYou\'ve received '}
+              <Text style={phaseUpStyles.reward}>bonus coins</Text>
+              {' as a reward.\n\nA new seed has sprouted — your next tree is '}
+              <Text style={phaseUpStyles.treeName}>{nextTreeName}</Text>
+              {'. Keep growing! 🌱'}
+            </Text>
+            <Pressable
+              style={({ pressed }) => [phaseUpStyles.btn, pressed && phaseUpStyles.btnPressed]}
+              onPress={handleDismissTreeComplete}
+            >
+              <Text style={phaseUpStyles.btnText}>Start Growing {nextTreeName}!</Text>
             </Pressable>
           </View>
         </View>
@@ -714,7 +787,7 @@ export default function HomeScreen() {
 
       {/* ── Main content ── */}
       <View style={styles.mainContent}>
-        <TreeVisual phase={phase} waterUnits={waterUnits} name={treeName} />
+        <TreeVisual treeId={gameState?.currentTreeId ?? 1} phase={phase} waterUnits={waterUnits} name={treeName} />
 
         {/* Today's tasks preview */}
         <View style={styles.tasksPreview}>
@@ -1017,6 +1090,10 @@ const phaseUpStyles = StyleSheet.create({
   },
   btnPressed: { backgroundColor: '#4A9A76', transform: [{ scale: 0.98 }] },
   btnText: { fontSize: 17, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.3 },
+});
+
+const treeCompleteStyles = StyleSheet.create({
+  badgeRow: { backgroundColor: '#D4A017' },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
