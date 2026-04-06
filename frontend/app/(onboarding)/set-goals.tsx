@@ -36,8 +36,6 @@ const THEME = {
 
 const CUSTOM_HABIT_MIN_LEN = 3;
 
-const userId = "testUser123"; // TODO: get real user ID from auth context
-
 export default function SetGoalsScreen() {
   const router = useRouter();
   const [selected, setSelected] = React.useState<Set<string>>(() => new Set());

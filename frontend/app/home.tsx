@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { auth } from '@/lib/firebase';
 import { GameColors } from '../constants/theme';
 import * as gameApi from '@/lib/gameApi';
 import type { GameState, UserStreak, Tree, WarningStatus, WellnessResource, DailyTask } from '@/types/game.type';
@@ -23,8 +24,6 @@ import type { GameState, UserStreak, Tree, WarningStatus, WellnessResource, Dail
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-// TODO: replace with userId from auth context once teammate's PR is merged
-const USER_ID = 'testUser123';
 
 const WATER_PER_PHASE = 7;
 
@@ -305,6 +304,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const userId = auth.currentUser?.uid ?? '';
+
   // ── Remote state ──
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [streak, setStreak] = useState<UserStreak | null>(null);
@@ -346,10 +347,10 @@ export default function HomeScreen() {
   const loadData = useCallback(async () => {
     try {
       const [state, streakData, warning, profile] = await Promise.all([
-        gameApi.getGameState(USER_ID),
-        gameApi.getStreak(USER_ID),
-        gameApi.getWarningStatus(USER_ID),
-        gameApi.getUserProfile(USER_ID),
+        gameApi.getGameState(userId),
+        gameApi.getStreak(userId),
+        gameApi.getWarningStatus(userId),
+        gameApi.getUserProfile(userId),
       ]);
       setGameState(state);
       setStreak(streakData);
@@ -365,7 +366,7 @@ export default function HomeScreen() {
 
       // Load today's confirmed tasks
       try {
-        const todayTasks = await gameApi.getDailyTasks(USER_ID, gameApi.todayDate());
+        const todayTasks = await gameApi.getDailyTasks(userId, gameApi.todayDate());
         setDailyTask(todayTasks);
       } catch {
         // 404 = no tasks confirmed yet for today
@@ -400,14 +401,14 @@ export default function HomeScreen() {
 
   // ── Fertilizer handlers ──
   const handleUseFertilizer = async () => {
-    const updated = await gameApi.useFertilizer(USER_ID);
+    const updated = await gameApi.useFertilizer(userId);
     setGameState(updated);
     warningDismissedRef.current = true;
     setWarningStatus({ type: 'none' });
   };
 
   const handleDeclineFertilizer = async () => {
-    const updated = await gameApi.declineFertilizer(USER_ID);
+    const updated = await gameApi.declineFertilizer(userId);
     setGameState(updated);
     warningDismissedRef.current = true;
     setWarningStatus({ type: 'none' });
@@ -422,7 +423,7 @@ export default function HomeScreen() {
       const oldPhase = phase;
       const oldStreakCount = streak?.fullCompletionDays ?? 0;
 
-      const result = await gameApi.finalizeDailyTasks(USER_ID, gameApi.todayDate());
+      const result = await gameApi.finalizeDailyTasks(userId, gameApi.todayDate());
       setDailyTask((prev) => (prev ? { ...prev, finalized: true } : prev));
       setCoinsEarned(result.coinsEarned + result.eventBonusCoins);
 
@@ -433,7 +434,7 @@ export default function HomeScreen() {
 
       // Streak milestone check
       try {
-        const newStreakData = await gameApi.getStreak(USER_ID);
+        const newStreakData = await gameApi.getStreak(userId);
         setStreak(newStreakData);
         const newCount = newStreakData.fullCompletionDays;
         if (newCount > 0 && newCount % 7 === 0 && oldStreakCount % 7 !== 0) {
@@ -454,7 +455,7 @@ export default function HomeScreen() {
   const handleCompleteTask = async (taskId: string) => {
     if (!dailyTask || dailyTask.finalized) return;
     try {
-      await gameApi.completeTask(USER_ID, gameApi.todayDate(), taskId);
+      await gameApi.completeTask(userId, gameApi.todayDate(), taskId);
       const task = dailyTask.tasks.find((t) => t.taskId === taskId);
       const updatedTasks = dailyTask.tasks.map((t) =>
         t.taskId === taskId ? { ...t, isCompleted: true } : t,

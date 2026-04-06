@@ -109,7 +109,7 @@ export default function OnboardingScreen() {
               </Pressable>
 
               <Pressable
-                onPress={() => router.push("./home")}
+                onPress={() => router.push("./login")}
                 style={viewStyles.secondaryButton}
               >
                 <Text style={textStyles.secondaryButtonText}>
