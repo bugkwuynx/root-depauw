@@ -22,6 +22,7 @@ export interface ExpoTicket {
 
 export interface SaveTokenPayload {
     token: string;
+    userId: string;
 }
 
 export interface SendToAllPayload {
