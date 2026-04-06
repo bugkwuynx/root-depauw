@@ -14,7 +14,7 @@ export default interface CampusEvent {
   location: EventLocation;
   startTime: Date;
   endTime: Date;           // both examples have it, but treat as optional
-  imageUrl: string;        // cover image on the event page
+  imageUrl?: string;       // cover image on the event page
   tags: string[];          // Engage has categories, but may not be in HTML
   contactEmail?: string;    // only sometimes listed under Additional Information
   fetchedAt: Date;          // timestamp of when the crawler grabbed this
