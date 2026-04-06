@@ -1,12 +1,58 @@
 import React, { useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { FontAwesome5 } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
   withTiming,
+  Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pastel colours for goal tags (cycles by index)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PASTEL_COLORS = [
+  { bg: '#FFD6D6', text: '#A03030' },
+  { bg: '#FFE8CC', text: '#8A4A00' },
+  { bg: '#FFF8C2', text: '#7A6200' },
+  { bg: '#D6F5E0', text: '#1E6B3A' },
+  { bg: '#D6EEFF', text: '#1A5080' },
+  { bg: '#EDD6FF', text: '#6A1A8A' },
+];
+
+function labelColorIndex(label: string): number {
+  let h = 0;
+  for (let i = 0; i < label.length; i++) {
+    h = (Math.imul(31, h) + label.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h) % PASTEL_COLORS.length;
+}
+
+function GoalTag({ label }: { label: string }) {
+  const { bg, text } = PASTEL_COLORS[labelColorIndex(label)]!;
+  return (
+    <View style={[tagStyles.tag, { backgroundColor: bg }]}>
+      <Text style={[tagStyles.label, { color: text }]} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+const tagStyles = StyleSheet.create({
+  tag: {
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginRight: 4,
+  },
+  label: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SetupTaskItem  (editing phase — X to remove, V to lock in)
@@ -17,9 +63,12 @@ interface SetupTaskItemProps {
   emoji: string;
   subtitle?: string;
   coinBonus?: number;
+  description?: string;
+  goals?: string[];
   isFixed: boolean;
   onFix: () => void;
   onDelete: () => void;
+  onPressCard?: () => void;
 }
 
 export function SetupTaskItem({
@@ -27,24 +76,19 @@ export function SetupTaskItem({
   emoji,
   subtitle,
   coinBonus,
+  description,
+  goals,
   isFixed,
   onFix,
   onDelete,
+  onPressCard,
 }: SetupTaskItemProps) {
   const cardOpacity = useSharedValue(1);
   const cardTranslateX = useSharedValue(0);
   const buttonsOpacity = useSharedValue(1);
   const buttonsScale = useSharedValue(1);
-  const badgeOpacity = useSharedValue(0);
   const checkScale = useSharedValue(1);
   const crossScale = useSharedValue(1);
-
-  // Fade in the "added ✓" badge when isFixed flips to true
-  useEffect(() => {
-    if (isFixed) {
-      badgeOpacity.value = withTiming(1, { duration: 220 });
-    }
-  }, [isFixed]);
 
   const cardStyle = useAnimatedStyle(() => ({
     opacity: cardOpacity.value,
@@ -54,7 +98,6 @@ export function SetupTaskItem({
     opacity: buttonsOpacity.value,
     transform: [{ scale: buttonsScale.value }],
   }));
-  const badgeStyle = useAnimatedStyle(() => ({ opacity: badgeOpacity.value }));
   const checkAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: checkScale.value }],
   }));
@@ -62,12 +105,10 @@ export function SetupTaskItem({
     transform: [{ scale: crossScale.value }],
   }));
 
-  // Use setTimeout instead of animation callbacks — guarantees JS-thread execution
-  // regardless of Reanimated's worklet/new-arch threading model.
   const handleFix = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     buttonsOpacity.value = withTiming(0, { duration: 180 });
-    buttonsScale.value = withSpring(0.3, { damping: 14 });
+    buttonsScale.value = withTiming(0.3, { duration: 180, easing: Easing.in(Easing.quad) });
     setTimeout(onFix, 210);
   };
 
@@ -78,38 +119,50 @@ export function SetupTaskItem({
     setTimeout(onDelete, 250);
   };
 
+  const hasGoals = goals && goals.length > 0;
+
   return (
     <Animated.View style={[styles.card, isFixed && styles.cardFixed, cardStyle]}>
-      {/* Left: emoji + text */}
-      <View style={styles.left}>
+      {/* Left: emoji + text — tappable to view details */}
+      <Pressable style={styles.left} onPress={onPressCard} disabled={!onPressCard}>
         <Text style={styles.emoji}>{emoji}</Text>
         <View style={styles.textWrap}>
-          <Text style={styles.title} numberOfLines={2}>
+          <Text style={styles.title}>
             {title}
           </Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+          {description ? (
+            <Text style={styles.descPreview} numberOfLines={2}>{description}</Text>
+          ) : null}
+          {hasGoals && (
+            <View style={styles.tagsRow}>
+              {goals!.map((g) => (
+                <GoalTag key={g} label={g} />
+              ))}
+            </View>
+          )}
           {coinBonus != null ? (
             <View style={styles.coinBadge}>
-              <Text style={styles.coinText}>+{coinBonus} 🪙</Text>
+              <FontAwesome5 name="coins" size={10} color="#92710A" />
+              <Text style={styles.coinText}>+{coinBonus}</Text>
             </View>
           ) : null}
+          {onPressCard ? (
+            <Text style={styles.tapHint}>Tap to view more details</Text>
+          ) : null}
         </View>
-      </View>
+      </Pressable>
 
-      {/* Right: X/V buttons or locked badge */}
-      {isFixed ? (
-        <Animated.View style={[styles.lockedBadge, badgeStyle]}>
-          <Text style={styles.lockedText}>added ✓</Text>
-        </Animated.View>
-      ) : (
+      {/* Right: X/V buttons (hidden once fixed) */}
+      {!isFixed && (
         <Animated.View style={[styles.buttons, buttonsStyle]}>
           {/* X — delete */}
           <Pressable
             onPressIn={() => {
-              crossScale.value = withSpring(0.75, { damping: 10 });
+              crossScale.value = withTiming(0.8, { duration: 80, easing: Easing.out(Easing.quad) });
             }}
             onPressOut={() => {
-              crossScale.value = withSpring(1, { damping: 10 });
+              crossScale.value = withTiming(1, { duration: 150, easing: Easing.out(Easing.quad) });
             }}
             onPress={handleDelete}
             hitSlop={8}
@@ -122,10 +175,10 @@ export function SetupTaskItem({
           {/* V — lock in */}
           <Pressable
             onPressIn={() => {
-              checkScale.value = withSpring(0.75, { damping: 10 });
+              checkScale.value = withTiming(0.8, { duration: 80, easing: Easing.out(Easing.quad) });
             }}
             onPressOut={() => {
-              checkScale.value = withSpring(1, { damping: 10 });
+              checkScale.value = withTiming(1, { duration: 150, easing: Easing.out(Easing.quad) });
             }}
             onPress={handleFix}
             hitSlop={8}
@@ -148,22 +201,25 @@ interface TrackingTaskItemProps {
   title: string;
   emoji: string;
   subtitle?: string;
+  goals?: string[];
   completed: boolean;
   onToggleComplete: () => void;
+  onPressCard?: () => void;
 }
 
 export function TrackingTaskItem({
   title,
   emoji,
   subtitle,
+  goals,
   completed,
   onToggleComplete,
+  onPressCard,
 }: TrackingTaskItemProps) {
-  // progress: 0 = empty circle, 1 = filled circle with ✓
   const progress = useSharedValue(completed ? 1 : 0);
 
   useEffect(() => {
-    progress.value = withSpring(completed ? 1 : 0, { damping: 13, stiffness: 180 });
+    progress.value = withTiming(completed ? 1 : 0, { duration: 220, easing: Easing.out(Easing.quad) });
   }, [completed]);
 
   const fillStyle = useAnimatedStyle(() => ({
@@ -171,7 +227,6 @@ export function TrackingTaskItem({
     opacity: progress.value,
   }));
 
-  // Animated.Text can be unstable with new arch — wrap Text in Animated.View instead
   const checkWrapStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
   }));
@@ -181,9 +236,15 @@ export function TrackingTaskItem({
     onToggleComplete();
   };
 
+  const hasGoals = goals && goals.length > 0;
+
   return (
-    <View style={[styles.card, completed && styles.cardCompleted]}>
-      {/* Left: emoji + text */}
+    <Pressable
+      style={[styles.card, completed && styles.cardCompleted]}
+      onPress={onPressCard}
+      android_ripple={{ color: '#E1F0E3' }}
+    >
+      {/* Left: emoji + text + meta */}
       <View style={styles.left}>
         <Text style={[styles.emoji, completed && { opacity: 0.4 }]}>{emoji}</Text>
         <View style={styles.textWrap}>
@@ -194,23 +255,38 @@ export function TrackingTaskItem({
             {title}
           </Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+
+          {/* Goals tags row — max 1 line */}
+          {hasGoals && (
+            <View style={styles.tagsRow}>
+              {goals!.map((g) => (
+                <GoalTag key={g} label={g} />
+              ))}
+            </View>
+          )}
+
+          {/* Bottom meta row: coins + tap hint */}
+          <View style={styles.metaRow}>
+            <View style={styles.coinBadge}>
+              <FontAwesome5 name="coins" size={10} color="#92710A" />
+              <Text style={styles.coinText}>+5</Text>
+            </View>
+            <Text style={styles.tapHint}>Tap to view more details</Text>
+          </View>
         </View>
       </View>
 
-      {/* Right: dotted completion circle */}
+      {/* Right: dotted completion circle — separate pressable so it doesn't open detail */}
       <Pressable onPress={handleToggle} hitSlop={12}>
         <View style={styles.circleWrapper}>
-          {/* Static dashed ring */}
           <View style={[styles.circleRing, completed && styles.circleRingDone]} />
-          {/* Animated green fill (scale + fade) */}
           <Animated.View style={[styles.circleFill, fillStyle]} />
-          {/* Checkmark — in Animated.View to avoid Animated.Text issues */}
           <Animated.View style={[styles.circleCheckWrap, checkWrapStyle]}>
             <Text style={styles.circleCheckText}>✓</Text>
           </Animated.View>
         </View>
       </Pressable>
-    </View>
+    </Pressable>
   );
 }
 
@@ -243,11 +319,11 @@ const styles = StyleSheet.create({
   left: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 10,
     marginRight: 8,
   },
-  emoji: { fontSize: 24 },
+  emoji: { fontSize: 24, marginTop: 2 },
   textWrap: { flex: 1 },
   title: {
     fontSize: 14,
@@ -264,16 +340,45 @@ const styles = StyleSheet.create({
     color: '#83BF99',
     marginTop: 2,
   },
+  descPreview: {
+    fontSize: 12,
+    color: '#7A9A85',
+    marginTop: 3,
+    lineHeight: 17,
+  },
+
+  // Goal tags
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    overflow: 'hidden',
+    marginTop: 6,
+  },
+
+  // Meta row (coins + tap hint)
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 8,
+  },
+  tapHint: {
+    fontSize: 11,
+    color: '#A0A0A0',
+    fontWeight: '400',
+  },
 
   coinBadge: {
-    marginTop: 5,
     backgroundColor: '#FFFBEB',
     borderRadius: 8,
     paddingHorizontal: 7,
-    paddingVertical: 2,
+    paddingVertical: 3,
     alignSelf: 'flex-start',
     borderWidth: 1,
     borderColor: '#FDE68A',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   coinText: { fontSize: 11, color: '#92710A', fontWeight: '700' },
 
@@ -298,17 +403,6 @@ const styles = StyleSheet.create({
     borderColor: '#83BF99',
   },
   checkText: { fontSize: 18, color: '#5FAD89', fontWeight: '700' },
-
-  // Locked badge (after V pressed)
-  lockedBadge: {
-    backgroundColor: '#E8F5EE',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: '#83BF99',
-  },
-  lockedText: { fontSize: 11, color: '#5FAD89', fontWeight: '700' },
 
   // Tracking completion circle
   circleWrapper: {

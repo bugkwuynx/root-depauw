@@ -11,9 +11,9 @@ const gameStatePath = (userId: string) => `users/${userId}/gameState/data`;
 
 // Mock wellness resources - CHANGE LATER
 const WELLNESS_RESOURCES = [
-    { name: 'DePauw Counseling Services', contact: '(765) 658-4268' },
-    { name: 'Crisis Text Line', contact: 'Text HOME to 741741' },
-    { name: '988 Suicide & Crisis Lifeline', contact: 'Call or text 988' },
+    { name: '24/7 Mental Heath support', contact: '(765) 658-4268' },
+    { name: 'DePauw Police', contact: '(765) 658-5555' },
+    { name: 'Medical Emergency', contact: '911' },
 ];
 
 export type WarningStatus =
@@ -39,6 +39,13 @@ async function getGameState(userId: string): Promise<GameState> {
 
 export async function fetchGameState(userId: string): Promise<GameState> {
     return getGameState(userId);
+}
+
+export async function getStreak(userId: string): Promise<UserStreak> {
+    const snap = await db.doc(userPath(userId)).get();
+    if (!snap.exists) throw new NotFoundError(`User ${userId} not found`);
+    const userData = snap.data() as { streak: UserStreak };
+    return userData.streak;
 }
 
 export function fetchAllTrees(): Tree[] {
@@ -74,7 +81,7 @@ export async function getWarningStatus(userId: string): Promise<WarningStatus> {
         return {
             type: 'wellness_check',
             day,
-            message: `Today is the ${day}${day === 5 ? 'th' : day === 6 ? 'th' : 'th'} day you haven't completed any tasks. Is everything okay? Do you need any help? Please keep up with your tasks to save your little tree!`,
+            message: `Today is the ${day}${day === 5 ? 'th' : day === 6 ? 'th' : 'th'} day you haven't completed any tasks. Is everything good? Keep up with your tasks to save your little tree! If you need support, here are some helpful resources:`,
             resources: WELLNESS_RESOURCES,
         };
     }
