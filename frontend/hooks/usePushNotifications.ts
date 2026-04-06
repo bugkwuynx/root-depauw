@@ -5,6 +5,7 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { PushNotificationState } from '../types/notification.type';
 import { saveToken } from '@/lib/notifications';
+import { auth } from '@/lib/firebase';
 
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -66,7 +67,8 @@ export function usePushNotifications(): PushNotificationState {
         registerForPushNotificationsAsync()
             .then(async (token) => {
                 if (token) {
-                    await saveToken(token);
+                    const uid = auth.currentUser?.uid;
+                    if (uid) await saveToken(token, uid);
                     setExpoPushToken(token);
                 }
             })
