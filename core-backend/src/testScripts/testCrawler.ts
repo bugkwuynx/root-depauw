@@ -1,5 +1,3 @@
-// src/scripts/testCrawler.ts
-
 import { crawlEvents } from "../crawler/eventCrawler.js";
 
 async function main() {

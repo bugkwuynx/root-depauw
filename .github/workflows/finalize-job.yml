@@ -1,0 +1,49 @@
+name: Finalize Job (Daily Midnight)
+
+on:
+  push:
+    branches: [uyen/phase-3]
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: core-backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: core-backend
+        run: npm ci
+
+      - name: Write Firebase service account credentials
+        working-directory: core-backend
+        run: |
+          mkdir -p src/credentials
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > src/credentials/service-account-file.json
+
+      - name: Build TypeScript
+        working-directory: core-backend
+        run: npm run build
+
+      - name: Copy credentials to build output
+        working-directory: core-backend
+        run: |
+          mkdir -p build/credentials
+          cp src/credentials/service-account-file.json build/credentials/service-account-file.json
+
+      - name: Run finalize job
+        working-directory: core-backend
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node build/jobs/finalizeJob.js
