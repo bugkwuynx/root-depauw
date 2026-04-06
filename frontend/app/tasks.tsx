@@ -22,16 +22,25 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { SetupTaskItem, TrackingTaskItem } from '@/components/TaskItem';
-import { mockDailyTasks, mockSuggestedEvents, mockCustomTasks } from '@/data/mockTasks';
 import * as gameApi from '@/lib/gameApi';
-import type { Task } from '@/types/game.type';
+import type { Task, Recommendation, RecommendationsCollection } from '@/types/game.type';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
 // TODO: replace with userId from auth context once teammate's PR is merged
-const USER_ID = 'testUser123';
+const USER_ID = 'test-user-finalize-job';
+
+// Pastel colours for goal tag chips in the detail modal
+const PASTEL_COLORS = [
+  { bg: '#FFD6D6', text: '#A03030' },
+  { bg: '#FFE8CC', text: '#8A4A00' },
+  { bg: '#FFF8C2', text: '#7A6200' },
+  { bg: '#D6F5E0', text: '#1E6B3A' },
+  { bg: '#D6EEFF', text: '#1A5080' },
+  { bg: '#EDD6FF', text: '#6A1A8A' },
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Emoji assignment based on task title keywords
@@ -81,42 +90,11 @@ type AppTask = {
   completed: boolean;
   subtitle?: string;
   coinBonus?: number;
+  description?: string;
+  goals?: string[];
 };
 
 type Phase = 'loading' | 'setup' | 'tracking';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Seed data from mocks (used for setup phase until recommendations are wired)
-// ─────────────────────────────────────────────────────────────────────────────
-
-const seedDailyTasks: AppTask[] = mockDailyTasks.map((t) => ({
-  id: t.id,
-  title: t.title,
-  emoji: t.emoji,
-  source: 'daily',
-  setupStatus: 'pending',
-  completed: false,
-}));
-
-const seedEvents: AppTask[] = mockSuggestedEvents.map((e) => ({
-  id: e.id,
-  title: e.title,
-  emoji: e.emoji,
-  source: 'event',
-  setupStatus: 'pending',
-  completed: false,
-  subtitle: `${e.time}  ·  ${e.location}`,
-  coinBonus: e.coinBonus,
-}));
-
-const seedCustomTasks: AppTask[] = mockCustomTasks.map((t) => ({
-  id: t.id,
-  title: t.title,
-  emoji: t.emoji,
-  source: 'custom',
-  setupStatus: 'pending',
-  completed: false,
-}));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Small shared sub-components
@@ -160,22 +138,26 @@ export default function TasksScreen() {
   const [isFinalized, setIsFinalized] = useState(false);
 
   // ── Setup phase state ──
-  const [dailyTasks, setDailyTasks] = useState<AppTask[]>(seedDailyTasks);
-  const [events, setEvents] = useState<AppTask[]>(seedEvents);
-  const [customTasks, setCustomTasks] = useState<AppTask[]>(seedCustomTasks);
+  const [dailyTasks, setDailyTasks] = useState<AppTask[]>([]);
+  const [events, setEvents] = useState<AppTask[]>([]);
+  const [customTasks, setCustomTasks] = useState<AppTask[]>([]);
   const [newTaskText, setNewTaskText] = useState('');
+  const [recommendationsLoaded, setRecommendationsLoaded] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // ── Tracking phase state ──
   const [allTasks, setAllTasks] = useState<AppTask[]>([]);
 
-  // ── Congrats modal ──
-  const [showCongrats, setShowCongrats] = useState(false);
-  const [coinsEarned, setCoinsEarned] = useState(0);
+  // ── Task detail modal ──
+  const [selectedTask, setSelectedTask] = useState<AppTask | null>(null);
 
   // ── Coin popup (per-task completion) ──
   const [showCoinPopup, setShowCoinPopup] = useState(false);
   const [coinPopupTitle, setCoinPopupTitle] = useState('');
   const coinPopupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Track if all tasks just became done so we navigate to home after popup
+  const navigateAfterPopupRef = useRef(false);
 
   // ── Confirm button animation ──
   const confirmScale = useSharedValue(0);
@@ -200,6 +182,16 @@ export default function TasksScreen() {
     transform: [{ scale: confirmScale.value }],
   }));
 
+  // ── Build event subtitle from recommendation times ──
+  function buildEventSubtitle(rec: Recommendation): string | undefined {
+    if (!rec.startTime) return undefined;
+    const fmt = (iso: string) =>
+      new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return rec.endTime
+      ? `${fmt(rec.startTime)} – ${fmt(rec.endTime)}`
+      : fmt(rec.startTime);
+  }
+
   // ── Load initial state on mount ──
   const loadInitialData = useCallback(async () => {
     try {
@@ -218,8 +210,9 @@ export default function TasksScreen() {
             : 'daily') as 'daily' | 'event' | 'custom',
           setupStatus: 'fixed' as const,
           completed: t.isCompleted,
+          description: t.description,
+          goals: t.goals,
         }));
-        // Uncompleted first, completed last
         setAllTasks([
           ...mapped.filter((t) => !t.completed),
           ...mapped.filter((t) => t.completed),
@@ -231,11 +224,69 @@ export default function TasksScreen() {
     } catch {
       // 404 = no tasks confirmed yet — fall through to setup phase
     }
+
+    // ── Setup phase: fetch AI recommendations, auto-generate if none exist ──
+    const date = gameApi.todayDate();
+    let recCollection: RecommendationsCollection | null = null;
+
+    try {
+      recCollection = await gameApi.getRecommendationsForUser(USER_ID, date);
+    } catch {
+      // 404 — no recommendations stored yet for today, trigger generation
+      try {
+        setIsGenerating(true);
+        setPhase('setup'); // show setup UI with loading indicator while generating
+        recCollection = await gameApi.generateRecommendations(USER_ID);
+      } catch (genErr) {
+        console.error('Failed to generate recommendations:', genErr);
+      } finally {
+        setIsGenerating(false);
+      }
+    }
+
+    if (recCollection) {
+      const recs: Recommendation[] = recCollection.recommendations ?? [];
+
+      const taskRecs = recs
+        .filter((r) => r.type === 'task')
+        .map((r, i): AppTask => ({
+          id: `rec-task-${i}`,
+          title: r.title,
+          emoji: assignEmoji(r.title, 'task'),
+          source: 'daily',
+          setupStatus: 'pending',
+          completed: false,
+          description: r.description,
+          goals: r.goals,
+        }));
+
+      const eventRecs = recs
+        .filter((r) => r.type === 'event')
+        .map((r, i): AppTask => ({
+          id: r.eventId ?? `rec-event-${i}`,
+          title: r.title,
+          emoji: '📅',
+          source: 'event',
+          setupStatus: 'pending',
+          completed: false,
+          subtitle: buildEventSubtitle(r),
+          description: r.description,
+          goals: r.goals,
+        }));
+
+      setDailyTasks(taskRecs);
+      setEvents(eventRecs);
+      setRecommendationsLoaded(true);
+    } else {
+      setDailyTasks([]);
+      setEvents([]);
+      setRecommendationsLoaded(false);
+    }
+
+    setCustomTasks([]);
     setPhase('setup');
   }, []);
 
-  // Re-sync from backend whenever this screen comes into focus (e.g. returning
-  // from home where the user may have completed tasks)
   useFocusEffect(
     useCallback(() => {
       loadInitialData();
@@ -270,6 +321,8 @@ export default function TasksScreen() {
       type: t.source === 'event' ? 'event' : t.source === 'custom' ? 'custom' : 'task',
       eventId: t.source === 'event' ? t.id : null,
       isCompleted: false,
+      description: t.description,
+      goals: t.goals,
     }));
 
     try {
@@ -300,21 +353,15 @@ export default function TasksScreen() {
 
   // ── Tracking handlers ──
 
-  const handleFinalizeDay = async () => {
-    try {
-      const result = await gameApi.finalizeDailyTasks(USER_ID, gameApi.todayDate());
-      setCoinsEarned(result.coinsEarned + result.eventBonusCoins);
-      setIsFinalized(true);
-      setShowCongrats(true);
-    } catch (e: any) {
-      // Already finalized from home screen — just mark locally
-      if (e.message?.includes('409') || e.message?.includes('already been finalized')) {
-        setIsFinalized(true);
-      } else {
-        console.error('Failed to finalize day:', e);
-      }
+  const dismissCoinPopup = useCallback(() => {
+    if (coinPopupTimerRef.current) clearTimeout(coinPopupTimerRef.current);
+    setShowCoinPopup(false);
+    // If all tasks are done, navigate to home for finalization
+    if (navigateAfterPopupRef.current) {
+      navigateAfterPopupRef.current = false;
+      router.replace('/home');
     }
-  };
+  }, [router]);
 
   const handleCompleteTask = async (taskId: string) => {
     if (isFinalized) return;
@@ -331,16 +378,24 @@ export default function TasksScreen() {
         ...updatedTasks.filter((t) => t.completed),
       ]);
 
+      const allDone = updatedTasks.every((t) => t.completed);
+
       // Show coin popup for this task
       if (task) {
         setCoinPopupTitle(task.title);
         setShowCoinPopup(true);
         if (coinPopupTimerRef.current) clearTimeout(coinPopupTimerRef.current);
-        coinPopupTimerRef.current = setTimeout(() => setShowCoinPopup(false), 2500);
-      }
 
-      if (updatedTasks.every((t) => t.completed)) {
-        setTimeout(() => handleFinalizeDay(), 600);
+        if (allDone) {
+          // Flag so that when the popup dismisses (by tap or timer), we navigate to home
+          navigateAfterPopupRef.current = true;
+          coinPopupTimerRef.current = setTimeout(dismissCoinPopup, 2500);
+        } else {
+          coinPopupTimerRef.current = setTimeout(() => setShowCoinPopup(false), 2500);
+        }
+      } else if (allDone) {
+        // No popup to wait for — navigate immediately
+        router.replace('/home');
       }
     } catch (e) {
       console.error('Failed to complete task:', e);
@@ -376,7 +431,7 @@ export default function TasksScreen() {
 
       {/* ── Coin Popup (per-task) ── */}
       <Modal visible={showCoinPopup} transparent animationType="fade" statusBarTranslucent>
-        <Pressable style={coinPopupStyles.overlay} onPress={() => setShowCoinPopup(false)}>
+        <Pressable style={coinPopupStyles.overlay} onPress={dismissCoinPopup}>
           <View style={coinPopupStyles.card}>
             <FontAwesome5 name="coins" size={26} color="#D4A017" />
             <Text style={coinPopupStyles.amount}>+5 Coins!</Text>
@@ -387,29 +442,65 @@ export default function TasksScreen() {
         </Pressable>
       </Modal>
 
-      {/* ── Congrats Modal ── */}
-      <Modal visible={showCongrats} transparent animationType="fade">
-        <View style={congratsStyles.overlay}>
-          <View style={congratsStyles.card}>
-            <Text style={congratsStyles.bigEmoji}>🎉</Text>
-            <Text style={congratsStyles.title}>Congrats!!!</Text>
-            <Text style={congratsStyles.body}>
-              Your tree is watered because of your hard work today!{'\n\n'}
-              You receive{' '}
-              <Text style={congratsStyles.coins}>{coinsEarned} Coins</Text>
-              {' '}for completing all the tasks!
-            </Text>
+      {/* ── Task Detail Modal ── */}
+      <Modal
+        visible={selectedTask !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedTask(null)}
+      >
+        <Pressable style={detailStyles.overlay} onPress={() => setSelectedTask(null)}>
+          <Pressable style={detailStyles.card} onPress={() => {}}>
+            {/* Header */}
+            <View style={detailStyles.headerRow}>
+              <Text style={detailStyles.titleEmoji}>
+                {selectedTask ? assignEmoji(selectedTask.title, selectedTask.source === 'event' ? 'event' : 'task') : '✨'}
+              </Text>
+              <Text style={detailStyles.title} numberOfLines={3}>
+                {selectedTask?.title}
+              </Text>
+            </View>
+
+            {/* Coins badge */}
+            <View style={detailStyles.coinRow}>
+              <FontAwesome5 name="coins" size={13} color="#D4A017" />
+              <Text style={detailStyles.coinText}>+5 coins on completion</Text>
+            </View>
+
+            {/* Goals tags */}
+            {selectedTask?.goals && selectedTask.goals.length > 0 && (
+              <View style={detailStyles.goalsSection}>
+                <Text style={detailStyles.goalsLabel}>Goals</Text>
+                <View style={detailStyles.tagsWrap}>
+                  {selectedTask.goals.map((g, i) => {
+                    const { bg, text } = PASTEL_COLORS[i % PASTEL_COLORS.length]!;
+                    return (
+                      <View key={i} style={[detailStyles.tag, { backgroundColor: bg }]}>
+                        <Text style={[detailStyles.tagText, { color: text }]}>{g}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {/* Description */}
+            {selectedTask?.description ? (
+              <View style={detailStyles.descSection}>
+                <Text style={detailStyles.descLabel}>About this task</Text>
+                <Text style={detailStyles.descText}>{selectedTask.description}</Text>
+              </View>
+            ) : null}
+
+            {/* Close button */}
             <Pressable
-              style={({ pressed }) => [
-                congratsStyles.acceptBtn,
-                pressed && congratsStyles.acceptBtnPressed,
-              ]}
-              onPress={() => setShowCongrats(false)}
+              style={({ pressed }) => [detailStyles.closeBtn, pressed && detailStyles.closeBtnPressed]}
+              onPress={() => setSelectedTask(null)}
             >
-              <Text style={congratsStyles.acceptText}>Accept</Text>
+              <Text style={detailStyles.closeBtnText}>Close</Text>
             </Pressable>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       <KeyboardAvoidingView
@@ -453,12 +544,21 @@ export default function TasksScreen() {
           ════════════════════════════════════════════════════════════════ */}
           {phase === 'setup' && (
             <>
-              {/* Hint text */}
-              <View style={styles.hintRow}>
-                <Text style={styles.hintText}>
-                  ✕ remove  ·  ✓ keep — confirm when ready
-                </Text>
-              </View>
+              {/* Hint text / generating indicator */}
+              {isGenerating ? (
+                <View style={styles.generatingRow}>
+                  <ActivityIndicator size="small" color="#5FAD89" />
+                  <Text style={styles.generatingText}>
+                    Generating your personalized tasks...
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.hintRow}>
+                  <Text style={styles.hintText}>
+                    ✕ remove  ·  ✓ keep — confirm when ready
+                  </Text>
+                </View>
+              )}
 
               {/* Section 1 — Today's Tasks */}
               <View style={styles.section}>
@@ -468,7 +568,13 @@ export default function TasksScreen() {
                   count={dailyTasks.length}
                 />
                 {dailyTasks.length === 0 ? (
-                  <EmptyState message="Section cleared!" />
+                  <EmptyState
+                    message={
+                      recommendationsLoaded
+                        ? 'Section cleared!'
+                        : 'No recommendations yet. Add your own!'
+                    }
+                  />
                 ) : (
                   dailyTasks.map((task) => (
                     <SetupTaskItem
@@ -491,7 +597,13 @@ export default function TasksScreen() {
                   count={events.length}
                 />
                 {events.length === 0 ? (
-                  <EmptyState message="Section cleared!" />
+                  <EmptyState
+                    message={
+                      recommendationsLoaded
+                        ? 'Section cleared!'
+                        : 'No recommendations yet. Add your own!'
+                    }
+                  />
                 ) : (
                   events.map((event) => (
                     <SetupTaskItem
@@ -499,7 +611,6 @@ export default function TasksScreen() {
                       title={event.title}
                       emoji={event.emoji}
                       subtitle={event.subtitle}
-                      coinBonus={event.coinBonus}
                       isFixed={event.setupStatus === 'fixed'}
                       onFix={() => handleFix(event.id, 'event')}
                       onDelete={() => handleDelete(event.id, 'event')}
@@ -571,43 +682,83 @@ export default function TasksScreen() {
               TRACKING PHASE
           ════════════════════════════════════════════════════════════════ */}
           {phase === 'tracking' && (
-            <View style={styles.section}>
-              <SectionHeader
-                emoji="🌱"
-                title="Today's Tasks"
-                count={allTasks.filter((t) => !t.completed).length}
-              />
-              {allTasks.length === 0 ? (
-                <EmptyState message="No tasks for today!" />
-              ) : (
-                allTasks.map((task) => (
-                  <Animated.View
-                    key={task.id}
-                    layout={LinearTransition.duration(320).easing(Easing.out(Easing.quad))}
-                  >
-                    <TrackingTaskItem
-                      title={task.title}
-                      emoji={task.emoji}
-                      subtitle={task.subtitle}
-                      completed={task.completed}
-                      onToggleComplete={() =>
-                        !task.completed && handleCompleteTask(task.id)
-                      }
-                    />
-                  </Animated.View>
-                ))
+            <>
+              {/* Section A — Events */}
+              {allTasks.some((t) => t.source === 'event') && (
+                <View style={styles.section}>
+                  <SectionHeader
+                    emoji="📅"
+                    title="Today's Events"
+                    count={allTasks.filter((t) => t.source === 'event' && !t.completed).length}
+                  />
+                  {allTasks
+                    .filter((t) => t.source === 'event')
+                    .map((task) => (
+                      <Animated.View
+                        key={task.id}
+                        layout={LinearTransition.duration(320).easing(Easing.out(Easing.quad))}
+                      >
+                        <TrackingTaskItem
+                          title={task.title}
+                          emoji={task.emoji}
+                          subtitle={task.subtitle}
+                          goals={task.goals}
+                          completed={task.completed}
+                          onToggleComplete={() =>
+                            !task.completed && handleCompleteTask(task.id)
+                          }
+                          onPressCard={() => setSelectedTask(task)}
+                        />
+                      </Animated.View>
+                    ))}
+                </View>
               )}
 
-              {allTasks.length > 0 &&
-                allTasks.every((t) => t.completed) &&
-                !showCongrats && (
-                  <View style={styles.allDoneRow}>
-                    <Text style={styles.allDoneText}>
-                      🎉  All done! Amazing work today!
-                    </Text>
-                  </View>
+              {/* Section B — Tasks (daily + custom) */}
+              <View style={styles.section}>
+                <SectionHeader
+                  emoji="🌱"
+                  title="Today's Tasks"
+                  count={
+                    allTasks.filter(
+                      (t) => t.source !== 'event' && !t.completed,
+                    ).length
+                  }
+                />
+                {allTasks.filter((t) => t.source !== 'event').length === 0 ? (
+                  <EmptyState message="No tasks for today!" />
+                ) : (
+                  allTasks
+                    .filter((t) => t.source !== 'event')
+                    .map((task) => (
+                      <Animated.View
+                        key={task.id}
+                        layout={LinearTransition.duration(320).easing(Easing.out(Easing.quad))}
+                      >
+                        <TrackingTaskItem
+                          title={task.title}
+                          emoji={task.emoji}
+                          subtitle={task.subtitle}
+                          goals={task.goals}
+                          completed={task.completed}
+                          onToggleComplete={() =>
+                            !task.completed && handleCompleteTask(task.id)
+                          }
+                          onPressCard={() => setSelectedTask(task)}
+                        />
+                      </Animated.View>
+                    ))
                 )}
-            </View>
+              </View>
+
+              {allTasks.length > 0 && allTasks.every((t) => t.completed) && (
+                <View style={styles.allDoneRow}>
+                  <Text style={styles.allDoneText}>
+                    🎉  All done! Heading back to home...
+                  </Text>
+                </View>
+              )}
+            </>
           )}
 
           <View style={{ height: 40 }} />
@@ -659,75 +810,113 @@ const coinPopupStyles = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Styles — Congrats Modal
+// Styles — Task Detail Modal
 // ─────────────────────────────────────────────────────────────────────────────
 
-const congratsStyles = StyleSheet.create({
+const detailStyles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 28,
+    paddingHorizontal: 24,
   },
   card: {
     width: '100%',
     backgroundColor: '#FFFFFF',
     borderRadius: 28,
-    paddingHorizontal: 28,
-    paddingTop: 36,
-    paddingBottom: 28,
-    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.2,
     shadowRadius: 28,
     elevation: 14,
   },
-  bigEmoji: {
-    fontSize: 64,
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
     marginBottom: 14,
   },
+  titleEmoji: { fontSize: 32 },
   title: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#2D5A3D',
-    marginBottom: 14,
-    letterSpacing: -0.5,
-  },
-  body: {
-    fontSize: 15,
-    color: '#555',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  coins: {
+    flex: 1,
+    fontSize: 18,
     fontWeight: '800',
-    color: '#D4A017',
+    color: '#2D5A3D',
+    lineHeight: 26,
+    marginTop: 4,
   },
-  acceptBtn: {
-    width: '100%',
+  coinRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 16,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    alignSelf: 'flex-start',
+  },
+  coinText: {
+    fontSize: 13,
+    color: '#92710A',
+    fontWeight: '700',
+  },
+  goalsSection: { marginBottom: 16 },
+  goalsLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#83BF99',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  tagsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  tag: {
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  descSection: { marginBottom: 20 },
+  descLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#83BF99',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  descText: {
+    fontSize: 14,
+    color: '#555',
+    lineHeight: 22,
+  },
+  closeBtn: {
     backgroundColor: '#5FAD89',
     borderRadius: 16,
-    paddingVertical: 16,
+    paddingVertical: 14,
     alignItems: 'center',
     shadowColor: '#5FAD89',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.28,
     shadowRadius: 10,
     elevation: 4,
   },
-  acceptBtnPressed: {
-    backgroundColor: '#4A9A76',
-    transform: [{ scale: 0.98 }],
-  },
-  acceptText: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.3,
-  },
+  closeBtnPressed: { backgroundColor: '#4A9A76', transform: [{ scale: 0.98 }] },
+  closeBtnText: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -776,9 +965,18 @@ const styles = StyleSheet.create({
   },
   progressText: { fontSize: 13, fontWeight: '700', color: '#5FAD89' },
 
-  // Hint
+  // Hint / generating
   hintRow: { marginBottom: 10, paddingHorizontal: 4 },
   hintText: { fontSize: 12, color: '#83BF99', fontWeight: '500', textAlign: 'center' },
+  generatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 10,
+    paddingHorizontal: 4,
+  },
+  generatingText: { fontSize: 12, color: '#5FAD89', fontWeight: '600' },
 
   // Scroll
   scroll: { flex: 1 },
@@ -886,4 +1084,3 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
-

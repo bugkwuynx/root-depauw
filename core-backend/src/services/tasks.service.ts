@@ -1,4 +1,5 @@
 import { db } from '../database/configFirestore.js';
+import { FieldValue } from 'firebase-admin/firestore';
 import { CalendarCompletionState, type CalendarCompletionMap } from '../types/calendar.type.js';
 import type { DailyTask, Task } from '../types/dailyTasks.type.js';
 import type { GameState } from '../types/gameState.type.js';
@@ -64,6 +65,7 @@ export async function getDailyTasks(userId: string, date: string): Promise<Daily
 
 export async function markTaskComplete(userId: string, date: string, taskId: string): Promise<Task> {
     const ref = db.doc(dailyTasksPath(userId, date));
+    const gameStateRef = db.doc(gameStatePath(userId));
     const snap = await ref.get();
     if (!snap.exists) throw new NotFoundError(`No tasks found for ${date}`);
 
@@ -74,7 +76,11 @@ export async function markTaskComplete(userId: string, date: string, taskId: str
     if (taskIndex === -1) throw new NotFoundError(`Task ${taskId} not found`);
 
     tasks[taskIndex]!.isCompleted = true;
-    await ref.update({ tasks });
+
+    const batch = db.batch();
+    batch.update(ref, { tasks });
+    batch.update(gameStateRef, { coins: FieldValue.increment(5) });
+    await batch.commit();
 
     return tasks[taskIndex]!;
 }

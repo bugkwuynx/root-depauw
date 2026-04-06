@@ -1,4 +1,4 @@
-import type { GameState, UserStreak, Tree, WarningStatus, Task, DailyTask, FinalizeResult, UserProfile } from '@/types/game.type';
+import type { GameState, UserStreak, Tree, WarningStatus, Task, DailyTask, FinalizeResult, UserProfile, RecommendationsCollection } from '@/types/game.type';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:3000';
 
@@ -8,8 +8,10 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     ...options,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { message?: string }).message ?? `HTTP ${res.status}`);
+    const err = await res.json().catch(() => ({})) as { message?: string; error?: string; detail?: string };
+    const msg = err.message ?? err.error ?? `HTTP ${res.status}`;
+    const detail = err.detail ? ` — ${err.detail}` : '';
+    throw new Error(`${msg}${detail}`);
   }
   return res.json() as Promise<T>;
 }
@@ -60,3 +62,9 @@ export const finalizeDailyTasks = (userId: string, date: string) =>
   request<FinalizeResult>(`/api/tasks/${userId}/${date}/finalize`, {
     method: 'POST',
   });
+
+export const getRecommendationsForUser = (userId: string, date: string) =>
+  request<RecommendationsCollection>(`/api/recommendations/${userId}?currentDate=${date}`);
+
+export const generateRecommendations = (userId: string) =>
+  request<RecommendationsCollection>(`/api/recommendations/${userId}/generate`, { method: 'POST' });

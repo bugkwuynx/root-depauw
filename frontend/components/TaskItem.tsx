@@ -10,6 +10,43 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Pastel colours for goal tags (cycles by index)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PASTEL_COLORS = [
+  { bg: '#FFD6D6', text: '#A03030' },
+  { bg: '#FFE8CC', text: '#8A4A00' },
+  { bg: '#FFF8C2', text: '#7A6200' },
+  { bg: '#D6F5E0', text: '#1E6B3A' },
+  { bg: '#D6EEFF', text: '#1A5080' },
+  { bg: '#EDD6FF', text: '#6A1A8A' },
+];
+
+function GoalTag({ label, index }: { label: string; index: number }) {
+  const { bg, text } = PASTEL_COLORS[index % PASTEL_COLORS.length]!;
+  return (
+    <View style={[tagStyles.tag, { backgroundColor: bg }]}>
+      <Text style={[tagStyles.label, { color: text }]} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+const tagStyles = StyleSheet.create({
+  tag: {
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginRight: 4,
+  },
+  label: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SetupTaskItem  (editing phase — X to remove, V to lock in)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -54,8 +91,6 @@ export function SetupTaskItem({
     transform: [{ scale: crossScale.value }],
   }));
 
-  // Use setTimeout instead of animation callbacks — guarantees JS-thread execution
-  // regardless of Reanimated's worklet/new-arch threading model.
   const handleFix = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     buttonsOpacity.value = withTiming(0, { duration: 180 });
@@ -137,18 +172,21 @@ interface TrackingTaskItemProps {
   title: string;
   emoji: string;
   subtitle?: string;
+  goals?: string[];
   completed: boolean;
   onToggleComplete: () => void;
+  onPressCard?: () => void;
 }
 
 export function TrackingTaskItem({
   title,
   emoji,
   subtitle,
+  goals,
   completed,
   onToggleComplete,
+  onPressCard,
 }: TrackingTaskItemProps) {
-  // progress: 0 = empty circle, 1 = filled circle with ✓
   const progress = useSharedValue(completed ? 1 : 0);
 
   useEffect(() => {
@@ -160,7 +198,6 @@ export function TrackingTaskItem({
     opacity: progress.value,
   }));
 
-  // Animated.Text can be unstable with new arch — wrap Text in Animated.View instead
   const checkWrapStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
   }));
@@ -170,9 +207,15 @@ export function TrackingTaskItem({
     onToggleComplete();
   };
 
+  const hasGoals = goals && goals.length > 0;
+
   return (
-    <View style={[styles.card, completed && styles.cardCompleted]}>
-      {/* Left: emoji + text */}
+    <Pressable
+      style={[styles.card, completed && styles.cardCompleted]}
+      onPress={onPressCard}
+      android_ripple={{ color: '#E1F0E3' }}
+    >
+      {/* Left: emoji + text + meta */}
       <View style={styles.left}>
         <Text style={[styles.emoji, completed && { opacity: 0.4 }]}>{emoji}</Text>
         <View style={styles.textWrap}>
@@ -183,23 +226,38 @@ export function TrackingTaskItem({
             {title}
           </Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+
+          {/* Goals tags row — max 1 line */}
+          {hasGoals && (
+            <View style={styles.tagsRow}>
+              {goals!.map((g, i) => (
+                <GoalTag key={i} label={g} index={i} />
+              ))}
+            </View>
+          )}
+
+          {/* Bottom meta row: coins + tap hint */}
+          <View style={styles.metaRow}>
+            <View style={styles.coinBadge}>
+              <FontAwesome5 name="coins" size={10} color="#92710A" />
+              <Text style={styles.coinText}>+5</Text>
+            </View>
+            <Text style={styles.tapHint}>Tap to view more details</Text>
+          </View>
         </View>
       </View>
 
-      {/* Right: dotted completion circle */}
+      {/* Right: dotted completion circle — separate pressable so it doesn't open detail */}
       <Pressable onPress={handleToggle} hitSlop={12}>
         <View style={styles.circleWrapper}>
-          {/* Static dashed ring */}
           <View style={[styles.circleRing, completed && styles.circleRingDone]} />
-          {/* Animated green fill (scale + fade) */}
           <Animated.View style={[styles.circleFill, fillStyle]} />
-          {/* Checkmark — in Animated.View to avoid Animated.Text issues */}
           <Animated.View style={[styles.circleCheckWrap, checkWrapStyle]}>
             <Text style={styles.circleCheckText}>✓</Text>
           </Animated.View>
         </View>
       </Pressable>
-    </View>
+    </Pressable>
   );
 }
 
@@ -232,11 +290,11 @@ const styles = StyleSheet.create({
   left: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 10,
     marginRight: 8,
   },
-  emoji: { fontSize: 24 },
+  emoji: { fontSize: 24, marginTop: 2 },
   textWrap: { flex: 1 },
   title: {
     fontSize: 14,
@@ -254,8 +312,28 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
+  // Goal tags
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    overflow: 'hidden',
+    marginTop: 6,
+  },
+
+  // Meta row (coins + tap hint)
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 8,
+  },
+  tapHint: {
+    fontSize: 11,
+    color: '#A0A0A0',
+    fontWeight: '400',
+  },
+
   coinBadge: {
-    marginTop: 5,
     backgroundColor: '#FFFBEB',
     borderRadius: 8,
     paddingHorizontal: 7,

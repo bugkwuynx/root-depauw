@@ -9,6 +9,8 @@ const TEST_USER_ID = 'testUser123';
 const user = {
     email: 'test@depauw.edu',
     name: 'Tra',
+    goals: ['physical wellness', 'academic success', 'social connection', 'mental health', 'career growth'],
+    preferences: { notificationsEnabled: true },
     streak: {
         fullCompletionDays: 6,
         partialCompletionDays: 0,
@@ -23,7 +25,7 @@ const gameState = {
     coins: 62,
     waterAppliedToPhase: 6,
     currentTreeId: 1,
-    currentPhase: TreePhase.Sapling,
+    currentPhase: TreePhase.Young,
     fertilizer: 0,
     pendingDegradation: false,   // set true so fertilizer endpoints are testable immediately
     lastUpdated: new Date(),

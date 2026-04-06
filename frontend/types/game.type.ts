@@ -45,6 +45,24 @@ export interface Task {
   type: string;
   eventId: string | null;
   isCompleted: boolean;
+  description?: string;
+  goals?: string[];
+}
+
+export interface Recommendation {
+  title: string;
+  description: string;
+  goals: string[];
+  type: 'event' | 'task';
+  eventId?: string;
+  startTime?: string;
+  endTime?: string;
+}
+
+export interface RecommendationsCollection {
+  date: string;
+  recommendations: Recommendation[];
+  generatedAt: string;
 }
 
 export interface DailyTask {

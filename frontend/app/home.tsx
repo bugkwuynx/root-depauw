@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import {
   View,
@@ -24,7 +24,7 @@ import type { GameState, UserStreak, Tree, WarningStatus, WellnessResource, Dail
 // ─────────────────────────────────────────────────────────────────────────────
 
 // TODO: replace with userId from auth context once teammate's PR is merged
-const USER_ID = 'testUser123';
+const USER_ID = 'test-user-finalize-job';
 
 const WATER_PER_PHASE = 7;
 
@@ -330,6 +330,9 @@ export default function HomeScreen() {
   const [streakMilestone, setStreakMilestone] = useState(7);
   const pendingStreakRef = useRef<number | null>(null);
 
+  // ── Day Complete pre-modal (shown before finalize is called) ──
+  const [showDayComplete, setShowDayComplete] = useState(false);
+
   // ── Coin popup (per-task completion) ──
   const [showCoinPopup, setShowCoinPopup] = useState(false);
   const [coinPopupTitle, setCoinPopupTitle] = useState('');
@@ -383,6 +386,18 @@ export default function HomeScreen() {
     }, [loadData]),
   );
 
+  // After loadData resolves, detect if all tasks are done but day not finalized yet.
+  // This covers the redirect from tasks.tsx after the last task is completed there.
+  useEffect(() => {
+    if (!dailyTask) return;
+    if (!dailyTask.confirmed || dailyTask.finalized) return;
+    const allDone =
+      dailyTask.tasks.length > 0 && dailyTask.tasks.every((t) => t.isCompleted);
+    if (allDone && !showDayComplete && !showCongrats) {
+      setShowDayComplete(true);
+    }
+  }, [dailyTask]);
+
   // ── Fertilizer handlers ──
   const handleUseFertilizer = async () => {
     const updated = await gameApi.useFertilizer(USER_ID);
@@ -399,7 +414,10 @@ export default function HomeScreen() {
   };
 
   // ── Task handlers ──
-  const handleFinalizeDay = async () => {
+
+  // Called when user accepts the "Day Complete" pre-modal — THIS is when finalize runs
+  const handleAcceptDayComplete = async () => {
+    setShowDayComplete(false);
     try {
       const oldPhase = phase;
       const oldStreakCount = streak?.fullCompletionDays ?? 0;
@@ -408,12 +426,12 @@ export default function HomeScreen() {
       setDailyTask((prev) => (prev ? { ...prev, finalized: true } : prev));
       setCoinsEarned(result.coinsEarned + result.eventBonusCoins);
 
-      // Phase change — use the gameState already returned by finalize (no extra API call)
+      // Phase change detected from finalize result
       if (result.gameState.currentPhase !== oldPhase) {
         pendingPhaseUpRef.current = result.gameState.currentPhase;
       }
 
-      // Streak milestone check (7-day and every 7 days after)
+      // Streak milestone check
       try {
         const newStreakData = await gameApi.getStreak(USER_ID);
         const newCount = newStreakData.fullCompletionDays;
@@ -422,7 +440,6 @@ export default function HomeScreen() {
         }
       } catch {}
 
-      // Show congrats AFTER all pending flags are set, before any UI data refresh
       setShowCongrats(true);
     } catch (e: any) {
       if (e.message?.includes('409') || e.message?.includes('already been finalized')) {
@@ -443,16 +460,25 @@ export default function HomeScreen() {
       );
       setDailyTask({ ...dailyTask, tasks: updatedTasks });
 
+      const allDone = updatedTasks.every((t) => t.isCompleted);
+
       // Show coin popup for this task
       if (task) {
         setCoinPopupTitle(task.title);
         setShowCoinPopup(true);
         if (coinPopupTimerRef.current) clearTimeout(coinPopupTimerRef.current);
-        coinPopupTimerRef.current = setTimeout(() => setShowCoinPopup(false), 2500);
-      }
-
-      if (updatedTasks.every((t) => t.isCompleted)) {
-        setTimeout(() => handleFinalizeDay(), 600);
+        if (allDone) {
+          // Dismiss coin popup early and immediately show Day Complete modal
+          coinPopupTimerRef.current = setTimeout(() => {
+            setShowCoinPopup(false);
+            setShowDayComplete(true);
+          }, 2500);
+        } else {
+          coinPopupTimerRef.current = setTimeout(() => setShowCoinPopup(false), 2500);
+        }
+      } else if (allDone) {
+        // No popup shown — go straight to Day Complete
+        setShowDayComplete(true);
       }
     } catch (e) {
       console.error('Failed to complete task:', e);
@@ -521,6 +547,29 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+
+      {/* ── Day Complete Pre-Modal (shown before finalize is called) ── */}
+      <Modal visible={showDayComplete} transparent animationType="fade">
+        <View style={congratsStyles.overlay}>
+          <View style={congratsStyles.card}>
+            <Text style={congratsStyles.bigEmoji}>🌟</Text>
+            <Text style={congratsStyles.title}>Day Complete!</Text>
+            <Text style={congratsStyles.body}>
+              Amazing work — you finished all your tasks today!{'\n\n'}
+              Tap below to water your tree and collect your rewards.
+            </Text>
+            <Pressable
+              style={({ pressed }) => [
+                congratsStyles.acceptBtn,
+                pressed && congratsStyles.acceptBtnPressed,
+              ]}
+              onPress={handleAcceptDayComplete}
+            >
+              <Text style={congratsStyles.acceptText}>Collect Rewards 🎁</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Congrats Modal ── */}
       <Modal visible={showCongrats} transparent animationType="fade">
@@ -602,19 +651,6 @@ export default function HomeScreen() {
             </Pressable>
           </View>
         </View>
-      </Modal>
-
-      {/* ── Coin Popup (per-task) ── */}
-      <Modal visible={showCoinPopup} transparent animationType="fade" statusBarTranslucent>
-        <Pressable style={coinPopupStyles.overlay} onPress={() => setShowCoinPopup(false)}>
-          <View style={coinPopupStyles.card}>
-            <FontAwesome5 name="coins" size={28} color="#D4A017" />
-            <Text style={coinPopupStyles.amount}>+5 Coins!</Text>
-            <Text style={coinPopupStyles.label} numberOfLines={2}>
-              "{coinPopupTitle}"
-            </Text>
-          </View>
-        </Pressable>
       </Modal>
 
       {/* ── Fertilizer Modal ── */}
@@ -726,6 +762,32 @@ export default function HomeScreen() {
           )}
         </View>
       </View>
+
+      {/* ── Coin Popup (per-task) — rendered last so it sits above all other modals ── */}
+      <Modal visible={showCoinPopup} transparent animationType="fade" statusBarTranslucent>
+        <Pressable
+          style={coinPopupStyles.overlay}
+          onPress={() => {
+            if (coinPopupTimerRef.current) clearTimeout(coinPopupTimerRef.current);
+            setShowCoinPopup(false);
+            // If last task was just completed, show Day Complete now instead of waiting
+            const allDone = dailyTask?.tasks.length
+              ? dailyTask.tasks.every((t) => t.isCompleted)
+              : false;
+            if (allDone && !dailyTask?.finalized) {
+              setShowDayComplete(true);
+            }
+          }}
+        >
+          <View style={coinPopupStyles.card}>
+            <FontAwesome5 name="coins" size={28} color="#D4A017" />
+            <Text style={coinPopupStyles.amount}>+5 Coins!</Text>
+            <Text style={coinPopupStyles.label} numberOfLines={2}>
+              "{coinPopupTitle}"
+            </Text>
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* ── Bottom nav bar ── */}
       <View style={[styles.navBar, { paddingBottom: insets.bottom + 8 }]}>
