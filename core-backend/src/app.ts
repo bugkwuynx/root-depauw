@@ -30,15 +30,10 @@ app.use((_req, res) => {
     res.status(404).json({ error: 'Not found' });
 });
 
-const server = app.listen(port, () => {
-    console.log(`Connected successfully on port ${port}`);
-});
+if (process.env.VERCEL !== '1') {
+    app.listen(port, () => {
+        console.log(`Connected successfully on port ${port}`);
+    });
+}
 
-server.on('error', (err: NodeJS.ErrnoException) => {
-    if (err.code === 'EADDRINUSE') {
-        console.error(`Port ${port} is already in use. Kill the existing process and retry.`);
-    } else {
-        console.error('Server error:', err);
-    }
-    process.exit(1);
-});
+export default app;
