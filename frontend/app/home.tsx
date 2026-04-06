@@ -24,7 +24,7 @@ import type { GameState, UserStreak, Tree, WarningStatus, WellnessResource, Dail
 // ─────────────────────────────────────────────────────────────────────────────
 
 // TODO: replace with userId from auth context once teammate's PR is merged
-const USER_ID = 'test-user-finalize-job';
+const USER_ID = 'testUser123';
 
 const WATER_PER_PHASE = 7;
 
@@ -434,6 +434,7 @@ export default function HomeScreen() {
       // Streak milestone check
       try {
         const newStreakData = await gameApi.getStreak(USER_ID);
+        setStreak(newStreakData);
         const newCount = newStreakData.fullCompletionDays;
         if (newCount > 0 && newCount % 7 === 0 && oldStreakCount % 7 !== 0) {
           pendingStreakRef.current = newCount;

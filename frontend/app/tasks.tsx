@@ -30,7 +30,7 @@ import type { Task, Recommendation, RecommendationsCollection } from '@/types/ga
 // ─────────────────────────────────────────────────────────────────────────────
 
 // TODO: replace with userId from auth context once teammate's PR is merged
-const USER_ID = 'test-user-finalize-job';
+const USER_ID = 'testUser123';
 
 // Pastel colours for goal tag chips in the detail modal
 const PASTEL_COLORS = [
@@ -472,10 +472,14 @@ export default function TasksScreen() {
               <View style={detailStyles.goalsSection}>
                 <Text style={detailStyles.goalsLabel}>Goals</Text>
                 <View style={detailStyles.tagsWrap}>
-                  {selectedTask.goals.map((g, i) => {
-                    const { bg, text } = PASTEL_COLORS[i % PASTEL_COLORS.length]!;
+                  {selectedTask.goals.map((g) => {
+                    let h = 0;
+                    for (let i = 0; i < g.length; i++) {
+                      h = (Math.imul(31, h) + g.charCodeAt(i)) | 0;
+                    }
+                    const { bg, text } = PASTEL_COLORS[Math.abs(h) % PASTEL_COLORS.length]!;
                     return (
-                      <View key={i} style={[detailStyles.tag, { backgroundColor: bg }]}>
+                      <View key={g} style={[detailStyles.tag, { backgroundColor: bg }]}>
                         <Text style={[detailStyles.tagText, { color: text }]}>{g}</Text>
                       </View>
                     );
@@ -581,9 +585,12 @@ export default function TasksScreen() {
                       key={task.id}
                       title={task.title}
                       emoji={task.emoji}
+                      description={task.description}
+                      goals={task.goals}
                       isFixed={task.setupStatus === 'fixed'}
                       onFix={() => handleFix(task.id, 'daily')}
                       onDelete={() => handleDelete(task.id, 'daily')}
+                      onPressCard={() => setSelectedTask(task)}
                     />
                   ))
                 )}
@@ -611,9 +618,12 @@ export default function TasksScreen() {
                       title={event.title}
                       emoji={event.emoji}
                       subtitle={event.subtitle}
+                      description={event.description}
+                      goals={event.goals}
                       isFixed={event.setupStatus === 'fixed'}
                       onFix={() => handleFix(event.id, 'event')}
                       onDelete={() => handleDelete(event.id, 'event')}
+                      onPressCard={() => setSelectedTask(event)}
                     />
                   ))
                 )}

@@ -22,8 +22,16 @@ const PASTEL_COLORS = [
   { bg: '#EDD6FF', text: '#6A1A8A' },
 ];
 
-function GoalTag({ label, index }: { label: string; index: number }) {
-  const { bg, text } = PASTEL_COLORS[index % PASTEL_COLORS.length]!;
+function labelColorIndex(label: string): number {
+  let h = 0;
+  for (let i = 0; i < label.length; i++) {
+    h = (Math.imul(31, h) + label.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h) % PASTEL_COLORS.length;
+}
+
+function GoalTag({ label }: { label: string }) {
+  const { bg, text } = PASTEL_COLORS[labelColorIndex(label)]!;
   return (
     <View style={[tagStyles.tag, { backgroundColor: bg }]}>
       <Text style={[tagStyles.label, { color: text }]} numberOfLines={1}>
@@ -55,9 +63,12 @@ interface SetupTaskItemProps {
   emoji: string;
   subtitle?: string;
   coinBonus?: number;
+  description?: string;
+  goals?: string[];
   isFixed: boolean;
   onFix: () => void;
   onDelete: () => void;
+  onPressCard?: () => void;
 }
 
 export function SetupTaskItem({
@@ -65,9 +76,12 @@ export function SetupTaskItem({
   emoji,
   subtitle,
   coinBonus,
+  description,
+  goals,
   isFixed,
   onFix,
   onDelete,
+  onPressCard,
 }: SetupTaskItemProps) {
   const cardOpacity = useSharedValue(1);
   const cardTranslateX = useSharedValue(0);
@@ -105,24 +119,39 @@ export function SetupTaskItem({
     setTimeout(onDelete, 250);
   };
 
+  const hasGoals = goals && goals.length > 0;
+
   return (
     <Animated.View style={[styles.card, isFixed && styles.cardFixed, cardStyle]}>
-      {/* Left: emoji + text */}
-      <View style={styles.left}>
+      {/* Left: emoji + text — tappable to view details */}
+      <Pressable style={styles.left} onPress={onPressCard} disabled={!onPressCard}>
         <Text style={styles.emoji}>{emoji}</Text>
         <View style={styles.textWrap}>
-          <Text style={styles.title} numberOfLines={2}>
+          <Text style={styles.title}>
             {title}
           </Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+          {description ? (
+            <Text style={styles.descPreview} numberOfLines={2}>{description}</Text>
+          ) : null}
+          {hasGoals && (
+            <View style={styles.tagsRow}>
+              {goals!.map((g) => (
+                <GoalTag key={g} label={g} />
+              ))}
+            </View>
+          )}
           {coinBonus != null ? (
             <View style={styles.coinBadge}>
               <FontAwesome5 name="coins" size={10} color="#92710A" />
               <Text style={styles.coinText}>+{coinBonus}</Text>
             </View>
           ) : null}
+          {onPressCard ? (
+            <Text style={styles.tapHint}>Tap to view more details</Text>
+          ) : null}
         </View>
-      </View>
+      </Pressable>
 
       {/* Right: X/V buttons (hidden once fixed) */}
       {!isFixed && (
@@ -230,8 +259,8 @@ export function TrackingTaskItem({
           {/* Goals tags row — max 1 line */}
           {hasGoals && (
             <View style={styles.tagsRow}>
-              {goals!.map((g, i) => (
-                <GoalTag key={i} label={g} index={i} />
+              {goals!.map((g) => (
+                <GoalTag key={g} label={g} />
               ))}
             </View>
           )}
@@ -310,6 +339,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#83BF99',
     marginTop: 2,
+  },
+  descPreview: {
+    fontSize: 12,
+    color: '#7A9A85',
+    marginTop: 3,
+    lineHeight: 17,
   },
 
   // Goal tags

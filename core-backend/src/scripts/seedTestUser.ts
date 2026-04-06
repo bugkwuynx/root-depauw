@@ -42,4 +42,7 @@ console.log(`✓ gameState written (coins=${gameState.coins}, pendingDegradation
 await db.doc(`users/${TEST_USER_ID}/dailyTasks/${TODAY}`).delete();
 console.log(`✓ dailyTasks/${TODAY} cleared`);
 
+await db.doc(`users/${TEST_USER_ID}/recommendations/${TODAY}`).delete();
+console.log(`✓ recommendations/${TODAY} cleared`);
+
 console.log(`\nDone — no process.exit so writes fully flush before Node exits`);

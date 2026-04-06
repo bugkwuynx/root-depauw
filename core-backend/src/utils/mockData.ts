@@ -12,7 +12,7 @@ const ALL_PHASES: TreePhase[] = [
 export const TREES: Tree[] = [
     {
         treeId: 1,
-        name: 'Oak Sapling',
+        name: 'Cactus',
         phases: ALL_PHASES,
         waterRequiredPerPhase: 7,
         totalWaterRequired: 35,
