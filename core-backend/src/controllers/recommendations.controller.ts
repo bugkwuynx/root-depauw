@@ -1,4 +1,4 @@
-import { getRecommendations, getRecommendationsForUser } from "../services/recommendations.service.js";
+import { getRecommendations, getRecommendationsForUser, generateRecommendationsForUser } from "../services/recommendations.service.js";
 import type {
     GetRecommendationsCollectionServiceRequest,
     GetRecommendationsControllerRequest,
@@ -35,6 +35,25 @@ export const getRecommendationsController = async (
     } catch (error) {
         console.error("Error in getRecommendationsController:", error);
         res.status(500).json({ error: "Failed to get recommendations" });
+    }
+}
+
+export const generateRecommendationsForUserController = async (
+    req: GetRecommendationsForUserControllerRequest,
+    res: Response<RecommendationsCollection | { error: string; detail?: string }>
+) => {
+    try {
+        const userId = req.params.userId;
+        const result = await generateRecommendationsForUser(userId);
+        if (!result) {
+            res.status(500).json({ error: "Failed to generate recommendations", detail: "Service returned null — check OPENAI_API_KEY and user goals" });
+            return;
+        }
+        res.json(result);
+    } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        console.error("Error in generateRecommendationsForUserController:", detail);
+        res.status(500).json({ error: "Failed to generate recommendations", detail });
     }
 }
 

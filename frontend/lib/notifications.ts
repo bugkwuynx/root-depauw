@@ -1,7 +1,7 @@
 import { SaveTokenResponse, SaveTokenPayload, GetDevicesResponse, SendNotificationPayload, SendToAllResponse, SendToAllPayload, SendToOneResponse, SendToOnePayload } from "@/types/notification.type";
 
 const BACKEND_URL =
-  process.env.EXPO_PUBLIC_BACKEND_URL || "http://localhost:5000";
+  process.env.EXPO_PUBLIC_BACKEND_URL || "http://localhost:3000";
 
 /**
  * Core fetch wrapper

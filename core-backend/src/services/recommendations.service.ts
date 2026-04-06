@@ -1,5 +1,6 @@
 import { db } from "../database/configFirestore.js";
-import { fromFirestore, type GetRecommendationsCollectionServiceRequest, type RecommendationsCollection, type RecommendationsCollectionDocument } from "../types/recommendations.type.js";
+import { fromFirestore, type GetRecommendationsCollectionServiceRequest, type RecommendationsCollection, type RecommendationsCollectionDocument, type DePauwEvent } from "../types/recommendations.type.js";
+import { crawlEvents } from "../crawler/eventCrawler.js";
 import OpenAI from "openai";
 
 export async function getRecommendations(
@@ -72,6 +73,64 @@ export async function getRecommendations(
     return recommendationsCollection;
 }
 
+
+/**
+ * Full self-contained generation: crawl events + fetch user goals + call AI + store.
+ * Called by the /generate endpoint so the frontend never needs to supply raw data.
+ */
+export async function generateRecommendationsForUser(userId: string): Promise<RecommendationsCollection | null> {
+    // 1. Fetch user goals from Firestore
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+        console.error(`User ${userId} not found`);
+        return null;
+    }
+    const userData = userDoc.data();
+    const userGoals: string[] = userData?.goals ?? [];
+
+    // 2. Crawl today's campus events
+    let campusEvents: DePauwEvent[] = [];
+    try {
+        const crawledEvents = await crawlEvents();
+
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+
+        campusEvents = crawledEvents
+            .filter((e) => {
+                const s = new Date(e.startTime);
+                return s >= todayStart && s <= todayEnd;
+            })
+            .map((e) => ({
+                id: e.id,
+                organizationName: e.organization,
+                eventTitle: e.title,
+                eventDescription: e.description,
+                location: [{ name: e.location.name }],
+                startTime: e.startTime.toISOString(),
+                endTime: e.endTime.toISOString(),
+                tags: e.tags,
+            }));
+    } catch (err) {
+        console.error('Event crawl failed, continuing with empty events:', err);
+    }
+
+    // 3. Generate via AI
+    const result = await getRecommendations({
+        campusEvents,
+        calendarEventsTime: [], // TODO: wire Google Calendar
+        userGoals,
+    });
+
+    if (!result) return null;
+
+    // 4. Store in Firestore
+    await db.collection(`users/${userId}/recommendations`).doc(result.date).set({ ...result });
+
+    return result;
+}
 
 export async function getRecommendationsForUser(userId: string, currentDate: string): Promise<RecommendationsCollection | null> {
     console.log("Fetching recommendations for user:", userId, "on date:", currentDate);
