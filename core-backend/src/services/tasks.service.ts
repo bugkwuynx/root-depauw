@@ -143,8 +143,6 @@ export async function finalizeDay(userId: string, date: string): Promise<Finaliz
     let newWater = gameState.waterAppliedToPhase + waterEarned;
     let newPhase = gameState.currentPhase;
     let newTreeId = gameState.currentTreeId;
-    let treeCompleted = false;
-
     // 4. Phase advance check (only on full completion which grants water)
     if (waterEarned > 0) {
         const currentTree = { waterRequiredPerPhase: 7 }; // from mock data
@@ -153,10 +151,8 @@ export async function finalizeDay(userId: string, date: string): Promise<Finaliz
             newPhase = advance.nextPhase;
             newWater = 0;
             if (advance.isTreeComplete) {
-                treeCompleted = true;
                 newCoins += 100; // tree completion reward
                 newTreeId = Math.min(newTreeId + 1, MAX_TREE_ID);
-                newPhase = advance.nextPhase; // resets to Seed via gameLogic
             }
         }
     }
@@ -168,10 +164,9 @@ export async function finalizeDay(userId: string, date: string): Promise<Finaliz
     // 6. Check milestones
     const milestones = checkStreakMilestones(mergedStreak);
 
-    let finalFullCompletionDays = mergedStreak.fullCompletionDays;
-    if (milestones.resetFullCompletionDays) {
+    const finalFullCompletionDays = mergedStreak.fullCompletionDays;
+    if (milestones.bonusCoins > 0) {
         newCoins += milestones.bonusCoins;
-        finalFullCompletionDays = 0;
     }
 
     const newFertilizer = gameState.fertilizer + milestones.bonusFertilizer;
@@ -217,10 +212,7 @@ export async function finalizeDay(userId: string, date: string): Promise<Finaliz
         eventBonusCoins,
         waterApplied: waterEarned,
         streakUpdate: finalStreak,
-        milestones: {
-            ...milestones,
-            bonusCoins: milestones.resetFullCompletionDays ? milestones.bonusCoins : 0,
-        },
+        milestones,
         gameState: updatedGameState,
     };
 }

@@ -34,6 +34,7 @@ export function computeStreakUpdate(
     if (state === 'full') {
         return {
             fullCompletionDays: (streak.fullCompletionDays ?? 0) + 1,
+            partialCompletionDays: 0,
             zeroCompletionDays: 0,
             lastFullCompletionDate: now,
         };
@@ -42,11 +43,13 @@ export function computeStreakUpdate(
         return {
             partialCompletionDays: (streak.partialCompletionDays ?? 0) + 1,
             fullCompletionDays: 0,
+            zeroCompletionDays: 0,
         };
     }
     // none
     return {
         zeroCompletionDays: (streak.zeroCompletionDays ?? 0) + 1,
+        partialCompletionDays: 0,
         fullCompletionDays: 0,
         lastZeroDate: now,
     };
@@ -69,10 +72,11 @@ export function checkStreakMilestones(
         triggerDegradationWarning: false,
     };
 
-    if ((updatedStreak.fullCompletionDays ?? 0) >= 7) {
+    const full = updatedStreak.fullCompletionDays ?? 0;
+    if (full > 0 && full % 7 === 0) {
         result.bonusCoins = 50;
         result.bonusFertilizer = 1;
-        result.resetFullCompletionDays = true;
+        // counter keeps growing — reward fires at 7, 14, 21, 28...
     }
 
     if ((updatedStreak.zeroCompletionDays ?? 0) >= 7) {

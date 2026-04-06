@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,17 +6,33 @@ import {
   StyleSheet,
   Pressable,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as gameApi from '@/lib/gameApi';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const COLS = 4;
 const SLOT_W = SCREEN_W / COLS;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Types & mock data
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+const USER_ID = 'testUser123';
+const TOTAL_SLOTS = 12;
+
+// Full-grown emoji for each treeId (shown in the collection shelf)
+const TREE_FULL_EMOJI: Record<number, string> = {
+  1: '🌲', // Oak Sapling
+  2: '💐', // Cherry Blossom
+  3: '🌵', // Cactus
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
 // ─────────────────────────────────────────────────────────────────────────────
 
 type CompletedTree = {
@@ -24,52 +40,25 @@ type CompletedTree = {
   id: number;
   name: string;
   emoji: string;
-  type: string;
 };
 type LockedTree = { status: 'locked'; id: number };
 type TreeSlot = CompletedTree | LockedTree;
 
-const TREE_DATA: Omit<CompletedTree, 'status' | 'id'>[] = [
-  { name: 'Prickly Pete', emoji: '🌵', type: 'Cactus' },
-  { name: 'Little Leaf',  emoji: '🌱', type: 'Sprout' },
-  { name: 'Shroomy',      emoji: '🍄', type: 'Mushroom' },
-  { name: 'Fernsby',      emoji: '🌿', type: 'Fern' },
-  { name: 'Cherry Pop',   emoji: '🌸', type: 'Blossom' },
-  { name: 'Bambu',        emoji: '🎋', type: 'Bamboo' },
-];
-
-const TOTAL_SLOTS = 12;
-const COMPLETED_COUNT = TREE_DATA.length; // 6
-
-const ALL_SLOTS: TreeSlot[] = Array.from({ length: TOTAL_SLOTS }, (_, i) =>
-  i < COMPLETED_COUNT
-    ? ({ status: 'completed', id: i, ...TREE_DATA[i] } as CompletedTree)
-    : ({ status: 'locked', id: i } as LockedTree),
-);
-
-// Split into rows of 4
-const SHELVES: TreeSlot[][] = [];
-for (let i = 0; i < ALL_SLOTS.length; i += COLS) {
-  SHELVES.push(ALL_SLOTS.slice(i, i + COLS));
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// Pot  (terracotta for completed, grey for locked)
+// Pot
 // ─────────────────────────────────────────────────────────────────────────────
 
 function Pot({ locked }: { locked: boolean }) {
   return (
     <View style={s.potWrap}>
-      {/* Rim */}
       <View style={[s.potRim, locked && s.potRimLocked]} />
-      {/* Body */}
       <View style={[s.potBody, locked && s.potBodyLocked]} />
     </View>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Plant slot (one cell on a shelf)
+// Plant slot
 // ─────────────────────────────────────────────────────────────────────────────
 
 function PlantSlot({ slot }: { slot: TreeSlot }) {
@@ -77,7 +66,6 @@ function PlantSlot({ slot }: { slot: TreeSlot }) {
     <View style={s.slot}>
       {slot.status === 'completed' ? (
         <>
-          {/* Completion star */}
           <View style={s.starWrap}>
             <Text style={s.star}>⭐</Text>
           </View>
@@ -97,7 +85,7 @@ function PlantSlot({ slot }: { slot: TreeSlot }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Name label (below the shelf plank)
+// Name label
 // ─────────────────────────────────────────────────────────────────────────────
 
 function NameLabel({ slot }: { slot: TreeSlot }) {
@@ -124,20 +112,15 @@ function NameLabel({ slot }: { slot: TreeSlot }) {
 function Shelf({ slots }: { slots: TreeSlot[] }) {
   return (
     <View style={s.shelfWrap}>
-      {/* Plants sitting above the plank */}
       <View style={s.plantsRow}>
         {slots.map((sl) => (
           <PlantSlot key={sl.id} slot={sl} />
         ))}
       </View>
-
-      {/* Wooden shelf plank */}
       <View style={s.plank}>
         <View style={s.plankHighlight} />
         <View style={s.plankShadow} />
       </View>
-
-      {/* Name tags below the plank */}
       <View style={s.nameRow}>
         {slots.map((sl) => (
           <NameLabel key={sl.id} slot={sl} />
@@ -153,6 +136,52 @@ function Shelf({ slots }: { slots: TreeSlot[] }) {
 
 export default function TreesScreen() {
   const router = useRouter();
+  const [completedCount, setCompletedCount] = useState(0);
+  const [slots, setSlots] = useState<TreeSlot[]>(() =>
+    Array.from({ length: TOTAL_SLOTS }, (_, i) => ({ status: 'locked', id: i } as LockedTree))
+  );
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      async function load() {
+        setLoading(true);
+        try {
+          const trees = await gameApi.getCompletedTrees(USER_ID);
+          if (!active) return;
+
+          const completed: CompletedTree[] = trees.map((t, i) => ({
+            status: 'completed',
+            id: i,
+            name: t.name,
+            emoji: TREE_FULL_EMOJI[t.treeId] ?? '🌱',
+          }));
+
+          const allSlots: TreeSlot[] = Array.from({ length: TOTAL_SLOTS }, (_, i) =>
+            i < completed.length
+              ? completed[i]!
+              : ({ status: 'locked', id: i } as LockedTree)
+          );
+
+          setCompletedCount(completed.length);
+          setSlots(allSlots);
+        } catch {
+          // keep showing locked slots on error
+        } finally {
+          if (active) setLoading(false);
+        }
+      }
+      load();
+      return () => { active = false; };
+    }, [])
+  );
+
+  // Split into rows of 4
+  const shelves: TreeSlot[][] = [];
+  for (let i = 0; i < slots.length; i += COLS) {
+    shelves.push(slots.slice(i, i + COLS));
+  }
 
   return (
     <SafeAreaView style={s.safe}>
@@ -166,7 +195,7 @@ export default function TreesScreen() {
           <Text style={s.headerSub}>Your completed garden</Text>
         </View>
         <View style={s.badge}>
-          <Text style={s.badgeText}>🌳 {COMPLETED_COUNT}/{TOTAL_SLOTS}</Text>
+          <Text style={s.badgeText}>🌳 {completedCount}/{TOTAL_SLOTS}</Text>
         </View>
       </View>
 
@@ -183,24 +212,28 @@ export default function TreesScreen() {
         ))}
       </View>
 
-      <ScrollView
-        style={s.scroll}
-        contentContainerStyle={s.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Shop label */}
-        <View style={s.shopHeader}>
-          <Text style={s.shopTitle}>🌿  Tree Collection</Text>
-          <Text style={s.shopHint}>Complete daily tasks to grow more trees!</Text>
+      {loading ? (
+        <View style={s.loadingWrap}>
+          <ActivityIndicator size="large" color="#5FAD89" />
         </View>
+      ) : (
+        <ScrollView
+          style={s.scroll}
+          contentContainerStyle={s.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={s.shopHeader}>
+            <Text style={s.shopTitle}>🌿  Tree Collection</Text>
+            <Text style={s.shopHint}>Complete daily tasks to grow more trees!</Text>
+          </View>
 
-        {/* Shelves */}
-        {SHELVES.map((shelf, i) => (
-          <Shelf key={i} slots={shelf} />
-        ))}
+          {shelves.map((shelf, i) => (
+            <Shelf key={i} slots={shelf} />
+          ))}
 
-        <View style={{ height: 48 }} />
-      </ScrollView>
+          <View style={{ height: 48 }} />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -214,7 +247,6 @@ const WALL_COLOR = '#EFF8EE';
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: WALL_COLOR },
 
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -244,15 +276,14 @@ const s = StyleSheet.create({
   },
   badgeText: { fontSize: 13, fontWeight: '700', color: '#5FAD89' },
 
-  // Striped awning
   awning: { flexDirection: 'row', height: 20 },
   awningStripe: { flex: 1 },
 
-  // Scroll
+  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
   scroll: { flex: 1 },
   scrollContent: { paddingTop: 0 },
 
-  // Shop label above shelves
   shopHeader: {
     paddingHorizontal: 20,
     paddingTop: 18,
@@ -262,17 +293,14 @@ const s = StyleSheet.create({
   shopTitle: { fontSize: 17, fontWeight: '700', color: '#2D5A3D' },
   shopHint: { fontSize: 12, color: '#83BF99', marginTop: 4, fontWeight: '500' },
 
-  // ── Shelf ──
   shelfWrap: { marginBottom: 10 },
-
   plantsRow: {
     flexDirection: 'row',
     backgroundColor: WALL_COLOR,
     paddingTop: 12,
-    alignItems: 'flex-end', // pots sit on the shelf
+    alignItems: 'flex-end',
   },
 
-  // Single plant slot
   slot: {
     width: SLOT_W,
     alignItems: 'center',
@@ -292,7 +320,6 @@ const s = StyleSheet.create({
     marginBottom: 2,
   },
 
-  // Locked "?" circle
   lockedCircle: {
     width: 52,
     height: 52,
@@ -307,14 +334,8 @@ const s = StyleSheet.create({
   },
   lockedQ: { fontSize: 24, color: '#B0B0B0', fontWeight: '900' },
 
-  // Pot
   potWrap: { alignItems: 'center' },
-  potRim: {
-    width: 48,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: '#B84A1A',
-  },
+  potRim: { width: 48, height: 9, borderRadius: 5, backgroundColor: '#B84A1A' },
   potRimLocked: { backgroundColor: '#AAAAAA' },
   potBody: {
     width: 40,
@@ -326,7 +347,6 @@ const s = StyleSheet.create({
   },
   potBodyLocked: { backgroundColor: '#C8C8C8' },
 
-  // Wooden plank
   plank: {
     height: 20,
     backgroundColor: '#C8915A',
@@ -339,22 +359,17 @@ const s = StyleSheet.create({
   },
   plankHighlight: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    top: 0, left: 0, right: 0,
     height: 5,
     backgroundColor: 'rgba(255,255,255,0.22)',
   },
   plankShadow: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    bottom: 0, left: 0, right: 0,
     height: 5,
     backgroundColor: '#A07040',
   },
 
-  // Name row
   nameRow: {
     flexDirection: 'row',
     backgroundColor: WALL_COLOR,
@@ -373,10 +388,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#C8E6C9',
   },
-  nameLabelLocked: {
-    backgroundColor: '#EBEBEB',
-    borderColor: '#D8D8D8',
-  },
+  nameLabelLocked: { backgroundColor: '#EBEBEB', borderColor: '#D8D8D8' },
   nameLabelText: {
     fontSize: 11,
     color: '#5FAD89',
