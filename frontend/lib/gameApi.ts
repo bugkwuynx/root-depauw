@@ -28,6 +28,9 @@ export const getWarningStatus = (userId: string) =>
 export const getTree = (treeId: number) =>
   request<Tree>(`/api/game/trees/${treeId}`);
 
+export const getCompletedTrees = (userId: string) =>
+  request<Tree[]>(`/api/game/${userId}/completed-trees`);
+
 export const useFertilizer = (userId: string) =>
   request<GameState>(`/api/game/${userId}/fertilizer/use`, { method: 'POST' });
 
