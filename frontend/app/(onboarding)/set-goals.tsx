@@ -1,11 +1,13 @@
-import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import React from "react";
-import { GOAL_CATALOG } from "@/lib/goalsCatalog";
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { auth } from '@/lib/firebase';
+import { db } from '@/lib/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { GOAL_CATALOG } from '@/lib/goalsCatalog';
 import {
   loadUserPreferences,
   newCustomGoalId,
-  saveUserPreferences,
   type UserGoal,
 } from "@/lib/userPreferences";
 import {
@@ -46,7 +48,9 @@ export default function SetGoalsScreen() {
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
-      const stored = await loadUserPreferences(userId);
+      const user = auth.currentUser;
+      if (!user) return;
+      const stored = await loadUserPreferences(user.uid);
       if (cancelled) return;
       const presetIds = new Set<string>();
       let custom = "";
@@ -82,7 +86,9 @@ export default function SetGoalsScreen() {
     if (!canContinue) return;
     setIsSaving(true);
     try {
-      const prev = await loadUserPreferences(userId);
+      const user = auth.currentUser;
+      if (!user) return;
+      const prev = await loadUserPreferences(user.uid);
       const goals: UserGoal[] = [];
       for (const id of selected) goals.push({ kind: "preset", presetId: id });
       if (customHabitOk) {
@@ -92,13 +98,53 @@ export default function SetGoalsScreen() {
           label: customHabitTrimmed,
         });
       }
-      await saveUserPreferences(userId, {
-        ...prev,
-        goals,
-        preferEmptyGoalsList: goals.length === 0,
-      });
-      await new Promise((r) => setTimeout(r, 200));
-      router.replace("./login");
+      if (user) {
+        const goalStrings = goals.map((g) => (g.kind === 'preset' ? g.presetId : g.label));
+        try {
+          const userRef = doc(db, 'users', user.uid);
+          const snap = await getDoc(userRef);
+          const now = new Date();
+
+          if (!snap.exists()) {
+            // Cloud Function hasn't run yet (or isn't deployed) — write the full document.
+            await setDoc(userRef, {
+              email: user.email ?? '',
+              name: prev.displayName || user.displayName || '',
+              authProvider:
+                user.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'email',
+              createdAt: now,
+              lastLogin: now,
+              preferences: { notificationsEnabled: true },
+              goals: goalStrings,
+              goalsUpdatedAt: now,
+              streak: {
+                fullCompletionDays: 0,
+                partialCompletionDays: 0,
+                zeroCompletionDays: 0,
+                lastFullCompletionDate: now,
+                lastZeroDate: now,
+                warningIssued: false,
+              },
+            });
+          } else {
+            // Cloud Function already created the doc — merge only user-owned fields.
+            await setDoc(
+              userRef,
+              {
+                name: prev.displayName || user.displayName || '',
+                goals: goalStrings,
+                goalsUpdatedAt: now,
+              },
+              { merge: true },
+            );
+          }
+        } catch (err) {
+          // Goals are already saved to AsyncStorage — don't block navigation.
+          // This typically means Firestore security rules need to be updated.
+          console.error('set-goals: Firestore write failed, continuing with local save:', err);
+        }
+      }
+      router.replace('./login');
     } finally {
       setIsSaving(false);
     }

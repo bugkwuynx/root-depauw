@@ -52,14 +52,18 @@ function stringsToGoals(strings: string[]): UserGoal[] {
 }
 
 export async function loadUserPreferences(userId: string): Promise<UserPreferences> {
-  const setting = await fetchUserPreferencesFromBackend(userId);
-  if (!setting) return DEFAULT_USER_PREFERENCES;
-  return {
-    goals: stringsToGoals(setting.goals),
-    displayName: setting.displayName,
-    remindersEnabled: setting.remindersEnabled,
-    preferEmptyGoalsList: setting.preferEmptyGoalsList,
-  };
+  try {
+    const setting = await fetchUserPreferencesFromBackend(userId);
+    if (!setting) return DEFAULT_USER_PREFERENCES;
+    return {
+      goals: stringsToGoals(setting.goals),
+      displayName: setting.displayName,
+      remindersEnabled: setting.remindersEnabled,
+      preferEmptyGoalsList: setting.preferEmptyGoalsList,
+    };
+  } catch {
+    return DEFAULT_USER_PREFERENCES;
+  }
 }
 
 export async function saveUserPreferences(userId: string, prefs: UserPreferences): Promise<void> {
