@@ -1,6 +1,10 @@
+import { useGoogleAuth } from '../../lib/googleAuth';
+import { auth } from '../../lib/firebase';
+import { loadUserPreferences, saveUserPreferences } from '../../lib/userPreferences';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, useRouter } from 'expo-router';
-import React from 'react';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import * as React from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -40,6 +44,8 @@ export default function SignupScreen() {
   const [isSubmittingEmail, setIsSubmittingEmail] = React.useState(false);
   const [isSubmittingGoogle, setIsSubmittingGoogle] = React.useState(false);
 
+  const { request, startGoogleSignIn } = useGoogleAuth();
+
   const emailError = React.useMemo(() => {
     if (email.trim().length === 0) return '';
     if (!isValidEmail(email)) return 'Please enter a valid email.';
@@ -74,30 +80,41 @@ export default function SignupScreen() {
 
     setIsSubmittingEmail(true);
     try {
-      // TODO: Replace with real sign-up call (backend/Firebase/Supabase/etc.)
-      await new Promise((r) => setTimeout(r, 650));
+      const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      await updateProfile(user, { displayName: name.trim() });
+      const prev = await loadUserPreferences();
+      await saveUserPreferences({ ...prev, displayName: name.trim() });
       router.replace('./set-goals');
-    } catch {
-      Alert.alert('Sign up failed', 'Please try again.');
+    } catch (error: any) {
+      console.log('SIGNUP ERROR:', error.code, error.message);
+      const msg =
+        error.code === 'auth/email-already-in-use'
+          ? 'An account with this email already exists.'
+          : error.code === 'auth/weak-password'
+            ? 'Password is too weak.'
+            : 'Sign up failed. Please try again.';
+      Alert.alert('Sign up failed', msg);
     } finally {
       setIsSubmittingEmail(false);
     }
-  }, [canSubmitEmail, router]);
-
+  }, [canSubmitEmail, email, password, router]);
   const onSignupWithGoogle = React.useCallback(async () => {
     if (isSubmittingEmail || isSubmittingGoogle) return;
 
     setIsSubmittingGoogle(true);
     try {
-      // TODO: Wire Google auth (expo-auth-session / Google Sign-In / etc.)
-      await new Promise((r) => setTimeout(r, 650));
-      Alert.alert('Google sign-in', 'Google auth is not wired yet (stub).');
-    } catch {
-      Alert.alert('Google sign-in failed', 'Please try again.');
+      const { user } = await startGoogleSignIn();
+      const prev = await loadUserPreferences();
+      await saveUserPreferences({ ...prev, displayName: user.displayName ?? '' });
+      router.replace('./set-goals');
+    } catch (error: any) {
+      if (error.message !== 'Google sign-in cancelled') {
+        Alert.alert('Google sign-in failed', 'Please try again.');
+      }
     } finally {
       setIsSubmittingGoogle(false);
     }
-  }, [isSubmittingEmail, isSubmittingGoogle]);
+  }, [isSubmittingEmail, isSubmittingGoogle, router, startGoogleSignIn]);
 
   return (
     <LinearGradient
@@ -210,7 +227,7 @@ export default function SignupScreen() {
 
               <Pressable
                 onPress={onSignupWithGoogle}
-                disabled={isSubmittingEmail || isSubmittingGoogle}
+                disabled={!request || isSubmittingEmail || isSubmittingGoogle}
                 style={({ pressed }) => [
                   styles.googleButton,
                   (isSubmittingEmail || isSubmittingGoogle) && styles.googleButtonDisabled,

@@ -1,6 +1,10 @@
+import { sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../lib/firebase';
+import { useGoogleAuth } from '../../lib/googleAuth';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, useRouter } from 'expo-router';
-import React from 'react';
+
+import * as React from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -41,6 +45,8 @@ export default function LoginScreen() {
   const [isSubmittingEmail, setIsSubmittingEmail] = React.useState(false);
   const [isSubmittingGoogle, setIsSubmittingGoogle] = React.useState(false);
 
+  const { request, startGoogleSignIn } = useGoogleAuth();
+
   const emailError = React.useMemo(() => {
     if (email.trim().length === 0) return '';
     if (!isValidEmail(email)) return 'Please enter a valid email.';
@@ -67,30 +73,38 @@ export default function LoginScreen() {
 
     setIsSubmittingEmail(true);
     try {
-      // TODO: Replace with real sign-in call (backend/Firebase/Supabase/etc.)
-      await new Promise((r) => setTimeout(r, 650));
+      await signInWithEmailAndPassword(auth, email, password);
+      router.replace('/home');
       Alert.alert('Signed in', 'You are now logged in (stub).');
-    } catch {
-      Alert.alert('Sign in failed', 'Please check your email and password and try again.');
+    } catch (error:any){
+      const errorMessages: Record<string, string> = {
+        'auth/user-not-found': 'Incorrect email or password.',
+        'auth/wrong-password': 'Incorrect email or password.',
+        'auth/too-many-requests': 'Too many attempts. Please try again later.',
+      };
+      const msg = errorMessages[error.code] ?? 'Sign in failed. Please try again.';
+
+      Alert.alert(msg);
     } finally {
       setIsSubmittingEmail(false);
     }
-  }, [canSubmitEmail]);
+  }, [canSubmitEmail, email, password, router]);
 
   const onLoginWithGoogle = React.useCallback(async () => {
     if (isSubmittingEmail || isSubmittingGoogle) return;
 
     setIsSubmittingGoogle(true);
     try {
-      // TODO: Wire Google auth (expo-auth-session / Google Sign-In / etc.)
-      await new Promise((r) => setTimeout(r, 650));
-      Alert.alert('Google sign-in', 'Google auth is not wired yet (stub).');
-    } catch {
-      Alert.alert('Google sign-in failed', 'Please try again.');
+      await startGoogleSignIn();
+      router.replace('/home');
+    } catch (error: any) {
+      if (error.message !== 'Google sign-in cancelled') {
+        Alert.alert('Google sign-in failed', 'Please try again.');
+      }
     } finally {
       setIsSubmittingGoogle(false);
     }
-  }, [isSubmittingEmail, isSubmittingGoogle]);
+  }, [isSubmittingEmail, isSubmittingGoogle, router, startGoogleSignIn]);
 
   return (
     <LinearGradient
@@ -154,7 +168,18 @@ export default function LoginScreen() {
 
               <Pressable
                 accessibilityRole="button"
-                onPress={() => Alert.alert('Forgot password', 'Password reset is not available yet (stub).')}
+                onPress={async () => {
+                  if (!isValidEmail(email)) {
+                    Alert.alert('Enter your email', 'Type your email above first, then tap Forgot password.');
+                    return;
+                  }
+                  try {
+                    await sendPasswordResetEmail(auth, email.trim());
+                    Alert.alert('Check your inbox', 'A password reset link has been sent.');
+                  } catch {
+                    Alert.alert('Error', 'Could not send reset email. Please try again.');
+                  }
+                }}
                 style={({ pressed }) => [styles.forgotWrap, pressed && styles.forgotPressed]}
               >
                 <Text style={styles.forgotText}>Forgot password?</Text>
@@ -187,7 +212,7 @@ export default function LoginScreen() {
 
               <Pressable
                 onPress={onLoginWithGoogle}
-                disabled={isSubmittingEmail || isSubmittingGoogle}
+                disabled={!request || isSubmittingEmail || isSubmittingGoogle}
                 style={({ pressed }) => [
                   styles.googleButton,
                   (isSubmittingEmail || isSubmittingGoogle) && styles.googleButtonDisabled,
