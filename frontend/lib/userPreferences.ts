@@ -3,7 +3,7 @@ import { Setting } from '@/types/setting.type';
 
 export const USER_ID_STORAGE_KEY = '@app:userId';
 
-const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_BASE_URL;
+const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
 export type UserGoal =
   | { kind: 'preset'; presetId: string }
