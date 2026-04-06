@@ -98,9 +98,9 @@ export default function SettingViewScreen() {
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const userId = "1";
+      const userId = "testUser123";
       userIdRef.current = userId;
-      const next = await loadUserPreferences(userId ?? "1");
+      const next = await loadUserPreferences(userId ?? "testUser123");
       setPrefs(next);
     } finally {
       setLoading(false);
