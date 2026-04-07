@@ -4,7 +4,7 @@ on:
   push:
     branches: [uyen/phase-3]
   schedule:
-    - cron: "0 12 * * *" # 12:00 UTC = 8:00am EDT (UTC-4)
+    - cron: "0 10 * * *" # 12:00 UTC = 8:00am EDT (UTC-4)
   workflow_dispatch:
 
 jobs:
