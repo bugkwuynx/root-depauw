@@ -90,6 +90,7 @@ export default function SettingViewScreen() {
   const [savingField, setSavingField] = React.useState<string | null>(null);
 
   const [addOpen, setAddOpen] = React.useState(false);
+  const [gameInstructionsOpen, setGameInstructionsOpen] = React.useState(false);
   const [customDraft, setCustomDraft] = React.useState("");
   const [displayNameDraft, setDisplayNameDraft] = React.useState("");
 
@@ -247,6 +248,18 @@ export default function SettingViewScreen() {
               </View>
             ) : (
               <>
+                <Pressable
+                  onPress={() => setGameInstructionsOpen(true)}
+                  style={({ pressed }) => [
+                    styles.gameInstructionsBtn,
+                    pressed && styles.gameInstructionsBtnPressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Game Instructions"
+                >
+                  <Text style={styles.gameInstructionsBtnText}>🌱 Game Instructions</Text>
+                </Pressable>
+
                 <View style={styles.sectionCard}>
                   <View style={styles.sectionTitleRow}>
                     <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>
@@ -512,6 +525,97 @@ export default function SettingViewScreen() {
               style={styles.modalClose}
             >
               <Text style={styles.modalCloseText}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={gameInstructionsOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setGameInstructionsOpen(false)}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setGameInstructionsOpen(false)}
+          />
+          <View style={[styles.modalSheet, { maxHeight: "96%" }]}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>GAME INSTRUCTIONS</Text>
+            <Text style={styles.modalSubtitle}>
+              How to grow your tree and earn rewards
+            </Text>
+            <ScrollView
+              style={styles.modalScroll}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Daily Tasks */}
+              <View style={styles.instrSection}>
+                <Text style={styles.instrSectionTitle}>1. DAILY TASKS</Text>
+                <Text style={styles.instrItem}>• Each day you receive a set of wellness tasks to complete</Text>
+                <Text style={styles.instrItem}>• Tasks span three categories: <Text style={styles.instrBold}>Physical, Mental, and Social </Text></Text>
+                <Text style={styles.instrItem}>• Special <Text style={styles.instrBold}>Campus Event 🎉</Text> tasks may also appear — attend DePauw events to earn bonus rewards</Text>
+                <Text style={styles.instrItem}>• Tasks reset every midnight — don't let the day slip away!</Text>
+              </View>
+
+              {/* Completion Rewards */}
+              <View style={styles.instrSection}>
+                <Text style={styles.instrSectionTitle}>2. DAILY COMPLETION REWARDS</Text>
+                <Text style={styles.instrItem}>• <Text style={styles.instrBold}>✅ Full completion</Text> (all tasks done) → <Text style={styles.instrHighlight}>+10 coins &amp; +1 water</Text></Text>
+                <Text style={styles.instrItem}>• <Text style={styles.instrBold}>🔶 Partial completion</Text> (some tasks done) → <Text style={styles.instrHighlight}>+5 coins</Text>, no water</Text>
+                <Text style={styles.instrItem}>• <Text style={styles.instrBold}>❌ No completion</Text> (nothing done) → no rewards earned</Text>
+              </View>
+
+              {/* Tree Growth */}
+              <View style={styles.instrSection}>
+                <Text style={styles.instrSectionTitle}>3. TREES GROWTH PHASES</Text>
+                <Text style={styles.instrItem}>• Your tree grows through <Text style={styles.instrBold}>5 stages</Text> as you collect water:</Text>
+                <Text style={styles.instrSubItem}>🌰  Seed</Text>
+                <Text style={styles.instrSubItem}>🌿  Seedling</Text>
+                <Text style={styles.instrSubItem}>🪴  Sapling</Text>
+                <Text style={styles.instrSubItem}>🌲  Young Tree</Text>
+                <Text style={styles.instrSubItem}>🌳  Full Grown</Text>
+                <Text style={styles.instrItem}>• Water is only earned by <Text style={styles.instrBold}>fully completing all tasks</Text> for the day</Text>
+                <Text style={styles.instrItem}>• Once your tree reaches Full Grown and collects enough water, it <Text style={styles.instrBold}>completes a full cycle</Text> and resets back to a Seed — start fresh and grow again!</Text>
+              </View>
+
+              {/* Streaks */}
+              <View style={styles.instrSection}>
+                <Text style={styles.instrSectionTitle}>4. STREAKS &amp; MILESTONES </Text>
+                <Text style={styles.instrItem}>• Your streak counts consecutive days of <Text style={styles.instrBold}>full completion</Text></Text>
+                <Text style={styles.instrItem}>• <Text style={styles.instrBold}>Every 7-day full-completion streak</Text> unlocks a milestone bonus:</Text>
+                <Text style={styles.instrSubItem}>🪙 <Text style={styles.instrHighlight}>+50 bonus coins</Text></Text>
+                <Text style={styles.instrSubItem}>🧪 <Text style={styles.instrHighlight}>+1 fertilizer</Text> (boosts tree growth)</Text>
+                <Text style={styles.instrItem}>• Bonuses keep firing at day 7, 14, 21, 28... keep the streak alive!</Text>
+                <Text style={styles.instrItem}>• Any day of partial or zero completion <Text style={styles.instrBold}>resets your full-completion streak</Text></Text>
+              </View>
+
+              {/* Tree Degradation */}
+              <View style={styles.instrSection}>
+                <Text style={styles.instrSectionTitle}>5. TREE DEGRADATION</Text>
+                <Text style={styles.instrItem}>• If you complete <Text style={styles.instrBold}>zero tasks for 7 or more days</Text> in a row, your tree is at risk</Text>
+                <Text style={styles.instrItem}>• You'll receive a <Text style={styles.instrBold}>degradation warning</Text> — your tree may regress back one growth phase</Text>
+                <Text style={styles.instrItem}>• Don't let your tree wither — even partial completion keeps it safe! </Text>
+              </View>
+
+              {/* Tips */}
+              <View style={[styles.instrSection, { marginBottom: 8 }]}>
+                <Text style={styles.instrSectionTitle}>8. TIPS</Text>
+                <Text style={styles.instrItem}>• Aim for full completion every day to earn water and grow your tree faster</Text>
+                <Text style={styles.instrItem}>• Keep an eye on campus events for easy bonus coins </Text>
+                <Text style={styles.instrItem}>• Even on busy days, do <Text style={styles.instrBold}>something</Text> — partial credit keeps your streak going and your tree alive</Text>
+                <Text style={styles.instrItem}>• Hit 7-day milestones consistently for the biggest rewards </Text>
+              </View>
+            </ScrollView>
+
+            <Pressable
+              onPress={() => setGameInstructionsOpen(false)}
+              style={styles.modalClose}
+            >
+              <Text style={styles.modalCloseText}>Got it!</Text>
             </Pressable>
           </View>
         </View>
@@ -963,5 +1067,59 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "900",
     color: "#FFFFFF",
+  },
+  gameInstructionsBtn: {
+    marginBottom: 14,
+    height: 52,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: THEME.accentDark,
+    shadowColor: "#3A8C68",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.32,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  gameInstructionsBtnPressed: { opacity: 0.88, transform: [{ scale: 0.98 }] },
+  gameInstructionsBtnText: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    letterSpacing: 0.2,
+  },
+  instrSection: {
+    marginBottom: 20,
+  },
+  instrSectionTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: THEME.text,
+    marginBottom: 10,
+    letterSpacing: 0.1,
+  },
+  instrItem: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: THEME.textMuted,
+    lineHeight: 22,
+    marginBottom: 4,
+    paddingLeft: 2,
+  },
+  instrSubItem: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: THEME.text,
+    lineHeight: 22,
+    marginBottom: 2,
+    paddingLeft: 18,
+  },
+  instrBold: {
+    fontWeight: "800",
+    color: THEME.text,
+  },
+  instrHighlight: {
+    fontWeight: "900",
+    color: THEME.accentDark,
   },
 });
