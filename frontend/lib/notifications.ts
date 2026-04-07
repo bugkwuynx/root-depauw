@@ -80,9 +80,9 @@ export async function saveToken(token: string, userId: string): Promise<SaveToke
 
     console.log("Payload for saving token: ", payload);
 
-    console.log(`${BASE_URL}/api/notifications/save-token`);
+    console.log(`${BASE_URL}api/notifications/save-token`);
 
-    const response = await fetch(`${BASE_URL}/api/notifications/save-token`, {
+    const response = await fetch(`${BASE_URL}api/notifications/save-token`, {
         method: "POST",
         body: await JSON.stringify(payload),
         headers: {

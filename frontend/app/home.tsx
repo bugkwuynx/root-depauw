@@ -362,6 +362,13 @@ export default function HomeScreen() {
 
   // ── Fetch all data — runs on every focus so cross-screen changes sync ──
   const loadData = useCallback(async () => {
+    // Read userId fresh each time — don't rely on the closure value which may
+    // have been captured before auth finished restoring from AsyncStorage.
+    const userId = auth.currentUser?.uid;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
     try {
       const [state, streakData, warning, profile] = await Promise.all([
         gameApi.getGameState(userId),

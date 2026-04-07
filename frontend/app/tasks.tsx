@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { auth } from '@/lib/firebase';
 import {
   View,
   Text,
@@ -29,8 +30,6 @@ import type { Task, Recommendation, RecommendationsCollection } from '@/types/ga
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-// TODO: replace with userId from auth context once teammate's PR is merged
-const USER_ID = 'testUser123';
 
 // Pastel colours for goal tag chips in the detail modal
 const PASTEL_COLORS = [
@@ -194,9 +193,11 @@ export default function TasksScreen() {
 
   // ── Load initial state on mount ──
   const loadInitialData = useCallback(async () => {
+    const userId = auth.currentUser?.uid;
+    if (!userId) return;
     try {
       const date = gameApi.todayDate();
-      const existing = await gameApi.getDailyTasks(USER_ID, date);
+      const existing = await gameApi.getDailyTasks(userId, date);
 
       if (existing.confirmed) {
         const mapped: AppTask[] = existing.tasks.map((t) => ({
@@ -230,13 +231,13 @@ export default function TasksScreen() {
     let recCollection: RecommendationsCollection | null = null;
 
     try {
-      recCollection = await gameApi.getRecommendationsForUser(USER_ID, date);
+      recCollection = await gameApi.getRecommendationsForUser(userId, date);
     } catch {
       // 404 — no recommendations stored yet for today, trigger generation
       try {
         setIsGenerating(true);
         setPhase('setup'); // show setup UI with loading indicator while generating
-        recCollection = await gameApi.generateRecommendations(USER_ID);
+        recCollection = await gameApi.generateRecommendations(userId);
       } catch (genErr) {
         console.error('Failed to generate recommendations:', genErr);
       } finally {
@@ -311,6 +312,8 @@ export default function TasksScreen() {
   };
 
   const handleConfirm = async () => {
+    const userId = auth.currentUser?.uid;
+    if (!userId) return;
     const fixed = [...dailyTasks, ...events, ...customTasks].filter(
       (t) => t.setupStatus === 'fixed',
     );
@@ -326,7 +329,7 @@ export default function TasksScreen() {
     }));
 
     try {
-      await gameApi.confirmTasks(USER_ID, gameApi.todayDate(), backendTasks);
+      await gameApi.confirmTasks(userId, gameApi.todayDate(), backendTasks);
       setAllTasks(fixed.map((t) => ({ ...t, completed: false })));
       setPhase('tracking');
     } catch (e) {
@@ -365,9 +368,11 @@ export default function TasksScreen() {
 
   const handleCompleteTask = async (taskId: string) => {
     if (isFinalized) return;
+    const userId = auth.currentUser?.uid;
+    if (!userId) return;
 
     try {
-      await gameApi.completeTask(USER_ID, gameApi.todayDate(), taskId);
+      await gameApi.completeTask(userId, gameApi.todayDate(), taskId);
 
       const task = allTasks.find((t) => t.id === taskId);
       const updatedTasks = allTasks.map((t) =>

@@ -1,3 +1,4 @@
+import { auth } from "@/lib/firebase";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -202,10 +203,9 @@ export default function CalendarViewScreen() {
   const [completionMap, setCompletionMap] =
     React.useState<RichCalendarDayCompletionMap>({});
   const [loading, setLoading] = React.useState(true);
-  const userId = "testUser123";
-
-  // Fetch completion data whenever the visible month or userId changes
+  // Fetch completion data whenever the visible month changes
   React.useEffect(() => {
+    const userId = auth.currentUser?.uid;
     if (!userId) return;
     let cancelled = false;
     (async () => {
@@ -224,7 +224,7 @@ export default function CalendarViewScreen() {
     return () => {
       cancelled = true;
     };
-  }, [cursor.year, cursor.monthIndex, userId]);
+  }, [cursor.year, cursor.monthIndex]);
 
   const cells = React.useMemo(
     () => buildMonthGrid(cursor.year, cursor.monthIndex),

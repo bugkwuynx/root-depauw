@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { auth } from "@/lib/firebase";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -96,11 +97,12 @@ export default function SettingViewScreen() {
   const [editDraft, setEditDraft] = React.useState("");
 
   const load = React.useCallback(async () => {
+    const userId = auth.currentUser?.uid;
+    if (!userId) return;
+    userIdRef.current = userId;
     setLoading(true);
     try {
-      const userId = "testUser123";
-      userIdRef.current = userId;
-      const next = await loadUserPreferences(userId ?? "testUser123");
+      const next = await loadUserPreferences(userId);
       setPrefs(next);
     } finally {
       setLoading(false);

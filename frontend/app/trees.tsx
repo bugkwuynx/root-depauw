@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { auth } from '@/lib/firebase';
 import {
   View,
   Text,
@@ -21,7 +22,6 @@ const SLOT_W = SCREEN_W / COLS;
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-const USER_ID = 'testUser123';
 const TOTAL_SLOTS = 12;
 
 // Full-grown emoji for each treeId (shown in the collection shelf)
@@ -146,9 +146,11 @@ export default function TreesScreen() {
     useCallback(() => {
       let active = true;
       async function load() {
+        const userId = auth.currentUser?.uid;
+        if (!userId) { setLoading(false); return; }
         setLoading(true);
         try {
-          const trees = await gameApi.getCompletedTrees(USER_ID);
+          const trees = await gameApi.getCompletedTrees(userId);
           if (!active) return;
 
           const completed: CompletedTree[] = trees.map((t, i) => ({

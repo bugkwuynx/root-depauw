@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { auth } from '@/lib/firebase';
 import { db } from '@/lib/firestore';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { GOAL_CATALOG } from '@/lib/goalsCatalog';
 import {
   loadUserPreferences,
@@ -105,7 +105,9 @@ export default function SetGoalsScreen() {
 
           if (!snap.exists()) {
             // Cloud Function hasn't run yet (or isn't deployed) — write the full document.
-            await setDoc(userRef, {
+            const gameStateRef = doc(db, 'users', user.uid, 'gameState', 'data');
+            const batch = writeBatch(db);
+            batch.set(userRef, {
               email: user.email ?? '',
               name: prev.displayName || user.displayName || '',
               authProvider:
@@ -124,6 +126,16 @@ export default function SetGoalsScreen() {
                 warningIssued: false,
               },
             });
+            batch.set(gameStateRef, {
+              coins: 0,
+              waterAppliedToPhase: 0,
+              currentTreeId: 1,
+              currentPhase: 'seed',
+              fertilizer: 0,
+              pendingDegradation: false,
+              lastUpdated: now,
+            });
+            await batch.commit();
           } else {
             // Cloud Function already created the doc — merge only user-owned fields.
             await setDoc(
