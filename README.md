@@ -8,7 +8,7 @@ Built for **TigerHacks 2026**.
 
 ## What it does
 
-Students set personal wellness goals (sleep better, ease stress, move more, etc.). Each morning the app generates a personalized task list that fits around their Google Calendar availability and real DePauw campus events. Completing tasks waters a virtual tree that grows through five phases. Miss too many days and the tree starts to wilt — unless you use a fertilizer boost to save it.
+Students set personal wellness goals (sleep better, ease stress, move more, etc.). Each morning the app generates a personalized task list that fits real DePauw campus events. Completing tasks waters a virtual tree that grows through five phases. Miss too many days and the tree starts to wilt — unless you use a fertilizer boost to save it.
 
 The app also surfaces campus mental health resources when it notices a student hasn't completed any tasks for several consecutive days.
 
