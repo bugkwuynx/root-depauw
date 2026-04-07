@@ -62,7 +62,7 @@ The app also surfaces campus mental health resources when it notices a student h
 | Full completion (all tasks done) | +10 | +1 |
 | Partial completion (at least one done) | +5 | 0 |
 | No completion | 0 | 0 |
-| Campus event task (per event completed) | +10 bonus | — |
+| Campus event task (per event completed) | +5 | — |
 
 ### Tree growth
 
