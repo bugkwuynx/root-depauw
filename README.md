@@ -280,5 +280,8 @@ This app does not collect or share any data with third parties. User data (goals
 
 ## Team
 
-Built at TigerHacks 2026 by the root@depauw team.
+Built at TigerHacks 2026 by:                                                                                                                
+      - Uyen (Ellie) Ngo                                                                                                   
+      - Khue Doan                                                                                                          
+      - Tra Nguyen  
 
