@@ -1,5 +1,7 @@
 # root@depauw
 
+**Winner of TigerHacks 2026**
+
 A gamified wellness and productivity mobile app for DePauw University students. Complete daily tasks, grow virtual trees, and stay accountable to your personal goals — all powered by AI-curated recommendations built around your schedule and campus life.
 
 Built for **TigerHacks 2026**.
