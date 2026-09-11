@@ -6,6 +6,13 @@ A gamified wellness and productivity mobile app for DePauw University students. 
 
 Built for **TigerHacks 2026**.
 
+<p align="center">
+  <img src="docs/images/screenshot-home.webp" width="24%" alt="Home screen showing today's stats and the growing Oak Sapling tree" />
+  <img src="docs/images/screenshot-tree-collection.webp" width="24%" alt="Tree Collection screen showing grown and locked tree species" />
+  <img src="docs/images/screenshot-tasks.webp" width="24%" alt="Task List screen showing today's AI-generated wellness tasks" />
+  <img src="docs/images/screenshot-calendar.webp" width="24%" alt="Calendar heatmap screen showing streak and daily completion history" />
+</p>
+
 ---
 
 ## What it does
